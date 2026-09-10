@@ -6,10 +6,8 @@
  * idempotent and never overwrites an existing account, so redeploys leave a
  * changed password alone.
  */
-import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
-
-const prisma = new PrismaClient();
+import { prisma } from "../lib/db";
 
 async function main() {
   const email = process.env.ADMIN_EMAIL?.trim().toLowerCase();

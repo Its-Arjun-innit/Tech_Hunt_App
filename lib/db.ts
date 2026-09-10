@@ -1,4 +1,8 @@
 import { PrismaClient } from "@prisma/client";
+import { resolveDatabaseEnv } from "./db-env";
+
+// Map integration-provided POSTGRES_* variables before the client reads them.
+resolveDatabaseEnv();
 
 // ponytail: single client reused across hot reloads and serverless invocations.
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
