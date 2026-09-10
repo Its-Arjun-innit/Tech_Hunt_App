@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { ConfirmButton } from "@/components/confirm-button";
 import { deleteChallenge, saveChallenge } from "@/app/admin/checkpoints/actions";
 
 type ChallengeValues = {
@@ -186,21 +187,26 @@ export function ChallengeEditor({
           {pending ? "Saving…" : "Save challenge"}
         </Button>
         {challenge && (
-          <Button
+          <ConfirmButton
             type="button"
             variant="destructive"
             disabled={pending}
-            onClick={() => {
-              if (!confirm("Remove this challenge?")) return;
-              startTransition(async () => {
-                const result = await deleteChallenge(checkpointId);
-                toast[result.ok ? "success" : "error"](result.message);
-                router.refresh();
-              });
-            }}
+            title="Remove this challenge?"
+            description="Teams will pass straight through this checkpoint and be routed onward. Attempt history for the challenge is deleted with it."
+            confirmLabel="Remove challenge"
+            onConfirm={() =>
+              new Promise<void>((resolve) =>
+                startTransition(async () => {
+                  const result = await deleteChallenge(checkpointId);
+                  toast[result.ok ? "success" : "error"](result.message);
+                  router.refresh();
+                  resolve();
+                }),
+              )
+            }
           >
             <Trash2 className="size-4" /> Remove
-          </Button>
+          </ConfirmButton>
         )}
       </div>
     </form>

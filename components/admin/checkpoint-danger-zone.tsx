@@ -6,6 +6,7 @@ import { Power, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ConfirmButton } from "@/components/confirm-button";
 import { deleteCheckpoint, setCheckpointActive } from "@/app/admin/checkpoints/actions";
 
 export function CheckpointDangerZone({
@@ -38,20 +39,25 @@ export function CheckpointDangerZone({
           <Power className="size-4" /> {active ? "Disable checkpoint" : "Enable checkpoint"}
         </Button>
 
-        <Button
+        <ConfirmButton
           variant="destructive"
           disabled={pending}
-          onClick={() => {
-            if (!confirm("Delete this checkpoint, its clues, challenge and scan history?")) return;
-            startTransition(async () => {
-              const result = await deleteCheckpoint(checkpointId);
-              toast[result.ok ? "success" : "error"](result.message);
-              if (result.ok) router.push("/admin/checkpoints");
-            });
-          }}
+          title="Delete this checkpoint?"
+          description="Its clues, challenge and scan history go with it, and any printed QR poster stops working. Teams already routed here will need rerouting. This cannot be undone."
+          confirmLabel="Delete checkpoint"
+          onConfirm={() =>
+            new Promise<void>((resolve) =>
+              startTransition(async () => {
+                const result = await deleteCheckpoint(checkpointId);
+                toast[result.ok ? "success" : "error"](result.message);
+                if (result.ok) router.push("/admin/checkpoints");
+                resolve();
+              }),
+            )
+          }
         >
           <Trash2 className="size-4" /> Delete checkpoint
-        </Button>
+        </ConfirmButton>
       </CardContent>
     </Card>
   );

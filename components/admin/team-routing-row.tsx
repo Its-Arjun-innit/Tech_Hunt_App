@@ -41,46 +41,57 @@ export function TeamRoutingRow({
     });
 
   return (
-    <div className="rounded-md border px-3 py-2.5 space-y-2">
-      <div className="flex flex-wrap items-center gap-2 text-sm">
-        <span className="font-medium min-w-0 truncate">{team.name}</span>
-        {team.status !== "ACTIVE" && (
-          <Badge variant="secondary" className="text-xs">
-            {team.status}
-          </Badge>
-        )}
+    <div className="rounded-lg border px-3 py-3 space-y-2.5 transition-colors hover:border-foreground/20">
+      {/* Columns on desktop so team, journey and score line up down the list;
+          stacked on a phone where the admin is likely standing up. */}
+      <div className="grid gap-2 sm:grid-cols-[minmax(7rem,1fr)_2fr_auto] sm:items-center">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="font-medium truncate">{team.name}</span>
+          {team.status !== "ACTIVE" && (
+            <Badge variant="secondary" className="text-xs shrink-0">
+              {team.status}
+            </Badge>
+          )}
+        </div>
 
-        <span className="text-muted-foreground">
-          {team.currentCheckpoint ?? "not started"}
-        </span>
-        <ArrowRight className="size-3.5 text-muted-foreground" />
-        <span className={team.destination ? "font-medium" : "text-muted-foreground"}>
-          {team.destination ?? "no destination"}
-        </span>
-
-        {team.expired && (
-          <Badge variant="outline" className="text-xs text-amber-600">
-            reservation expired
-          </Badge>
-        )}
-        {team.etaSeconds !== null && team.destination && (
-          <span className="text-xs text-muted-foreground">
-            ~{Math.max(1, Math.round(team.etaSeconds / 60))} min
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm min-w-0">
+          <span className="text-muted-foreground truncate">
+            {team.currentCheckpoint ?? "not started"}
           </span>
-        )}
+          <ArrowRight className="size-3.5 shrink-0 text-muted-foreground" />
+          <span className={`truncate ${team.destination ? "font-medium" : "text-muted-foreground"}`}>
+            {team.destination ?? "no destination"}
+          </span>
+          {team.etaSeconds !== null && team.destination && (
+            <span className="text-xs text-muted-foreground shrink-0">
+              ~{Math.max(1, Math.round(team.etaSeconds / 60))} min
+            </span>
+          )}
+          {team.expired && (
+            <Badge
+              variant="outline"
+              className="text-xs shrink-0 border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400"
+            >
+              reservation expired
+            </Badge>
+          )}
+        </div>
 
-        <span className="ml-auto font-semibold tabular-nums">{team.score}</span>
-
-        {team.reason && (
-          <Button
-            size="sm"
-            variant="ghost"
-            title="Why this destination?"
-            onClick={() => setShowReason((v) => !v)}
-          >
-            <Info className="size-3.5" />
-          </Button>
-        )}
+        <div className="flex items-center gap-1 justify-self-start sm:justify-self-end">
+          <span className="font-semibold tabular-nums tracking-tight">{team.score}</span>
+          {team.reason && (
+            <Button
+              size="sm"
+              variant="ghost"
+              aria-expanded={showReason}
+              title="Why this destination?"
+              onClick={() => setShowReason((v) => !v)}
+            >
+              <Info className="size-3.5" />
+              <span className="sr-only">Why this destination?</span>
+            </Button>
+          )}
+        </div>
       </div>
 
       {showReason && team.reason && (

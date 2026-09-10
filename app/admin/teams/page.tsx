@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Printer, Upload } from "lucide-react";
+import { Printer, Upload, Users } from "lucide-react";
 import { requireAdmin } from "@/lib/auth/admin";
 import { prisma } from "@/lib/db";
 import { getCurrentGame } from "@/lib/game-engine/current-game";
@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CreateTeamForm } from "@/components/admin/create-team-form";
 import { TeamRow } from "@/components/admin/team-row";
+import { PageHeader } from "@/components/admin/page-header";
+import { EmptyState } from "@/components/admin/empty-state";
 
 export const dynamic = "force-dynamic";
 
@@ -40,23 +42,20 @@ export default async function TeamsPage() {
 
   return (
     <div className="space-y-6 max-w-4xl">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold">Teams & players</h1>
-          <p className="text-muted-foreground text-sm">
-            {teams.length} team{teams.length === 1 ? "" : "s"} ·{" "}
-            {teams.reduce((n, t) => n + t.players.length, 0)} players
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" render={<Link href="/admin/teams/import" />}>
-            <Upload className="size-4" /> Import CSV
-          </Button>
-          <Button variant="outline" render={<Link href="/admin/teams/credentials" />}>
-            <Printer className="size-4" /> Credentials
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        title="Teams & players"
+        description={`${teams.length} team${teams.length === 1 ? "" : "s"} · ${teams.reduce((n, t) => n + t.players.length, 0)} players`}
+        actions={
+          <>
+            <Button variant="outline" render={<Link href="/admin/teams/import" />}>
+              <Upload className="size-4" /> Import CSV
+            </Button>
+            <Button variant="outline" render={<Link href="/admin/teams/credentials" />}>
+              <Printer className="size-4" /> Credentials
+            </Button>
+          </>
+        }
+      />
 
       <Card>
         <CardHeader className="pb-3">
@@ -69,9 +68,11 @@ export default async function TeamsPage() {
 
       <div className="space-y-3">
         {teams.length === 0 ? (
-          <p className="text-muted-foreground text-sm">
-            No teams yet. Add one above or import a roster.
-          </p>
+          <EmptyState
+            icon={Users}
+            title="No teams yet"
+            description="Add a team above, or import a whole roster as CSV and let the system generate every PIN."
+          />
         ) : (
           teams.map((team) => (
             <TeamRow

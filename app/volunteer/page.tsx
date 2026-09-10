@@ -43,7 +43,7 @@ export default async function VolunteerPage() {
 
   return (
     <main className="flex-1 pb-10">
-      <AutoRefresh seconds={10} />
+      <AutoRefresh seconds={10} showIndicator />
 
       <header className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur px-5 py-3">
         <div className="max-w-lg mx-auto flex items-center justify-between gap-3">

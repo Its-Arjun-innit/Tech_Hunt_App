@@ -6,6 +6,7 @@ import { KeyRound, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ConfirmButton } from "@/components/confirm-button";
 import { regenerateAllPins, type ImportedCredential } from "@/app/admin/teams/actions";
 
 type Roster = { teamName: string; memberName: string; memberCode: string };
@@ -26,27 +27,27 @@ export function CredentialsSheet({
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap gap-2 print:hidden">
-        <Button
+        <ConfirmButton
           variant="destructive"
           disabled={pending}
-          onClick={() => {
-            if (
-              !confirm(
-                "Issue a new PIN for every player? Existing PINs stop working and everyone is signed out.",
-              )
+          title="Issue a new PIN for every player?"
+          description="Every existing PIN stops working at once and all players are signed out, including any mid-game. The new list is shown only once, so print it before leaving the page."
+          confirmLabel="Issue new PINs"
+          onConfirm={() =>
+            new Promise<void>((resolve) =>
+              startTransition(async () => {
+                const result = await regenerateAllPins();
+                setIssued(result.credentials ?? null);
+                toast[result.ok ? "success" : "error"](result.message);
+                router.refresh();
+                resolve();
+              }),
             )
-              return;
-            startTransition(async () => {
-              const result = await regenerateAllPins();
-              setIssued(result.credentials ?? null);
-              toast[result.ok ? "success" : "error"](result.message);
-              router.refresh();
-            });
-          }}
+          }
         >
           <KeyRound className="size-4" />
           {pending ? "Issuing…" : "Issue new PINs for everyone"}
-        </Button>
+        </ConfirmButton>
 
         <Button variant="outline" onClick={() => window.print()}>
           <Printer className="size-4" /> Print this sheet

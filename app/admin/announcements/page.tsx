@@ -3,6 +3,9 @@ import { prisma } from "@/lib/db";
 import { getCurrentGame } from "@/lib/game-engine/current-game";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AnnouncementForm } from "@/components/admin/announcement-form";
+import { PageHeader } from "@/components/admin/page-header";
+import { EmptyState } from "@/components/admin/empty-state";
+import { Bell } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -28,12 +31,10 @@ export default async function AnnouncementsPage() {
 
   return (
     <div className="space-y-6 max-w-2xl">
-      <div>
-        <h1 className="text-2xl font-semibold">Announcements</h1>
-        <p className="text-muted-foreground text-sm">
-          Broadcast to every team, or only to the ones you pick.
-        </p>
-      </div>
+      <PageHeader
+        title="Announcements"
+        description="Broadcast to every team, or only to the ones you pick."
+      />
 
       <Card>
         <CardHeader className="pb-3">
@@ -57,7 +58,11 @@ export default async function AnnouncementsPage() {
           </div>
         ))}
         {announcements.length === 0 && (
-          <p className="text-sm text-muted-foreground">Nothing sent yet.</p>
+          <EmptyState
+            icon={Bell}
+            title="Nothing sent yet"
+            description="Announcements appear on every player dashboard within a few seconds."
+          />
         )}
       </div>
     </div>

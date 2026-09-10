@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { ConfirmButton } from "@/components/confirm-button";
 import {
   addPlayer, deletePlayer, deleteTeam, forceLogout, resetPin,
   setPlayerStatus, setTeamStatus,
@@ -56,10 +57,10 @@ export function TeamRow({ team }: { team: TeamView }) {
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
-          className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-muted/50"
+          className="w-full flex items-center gap-3 px-4 py-3 text-left outline-none transition-colors hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset"
         >
           <ChevronDown
-            className={`size-4 shrink-0 transition-transform ${open ? "rotate-180" : ""}`}
+            className={`size-4 shrink-0 motion-safe:transition-transform ${open ? "rotate-180" : ""}`}
           />
           <div className="min-w-0 flex-1">
             <p className="font-medium truncate">{team.name}</p>
@@ -95,25 +96,24 @@ export function TeamRow({ team }: { team: TeamView }) {
                   </>
                 )}
               </Button>
-              <Button
+              <ConfirmButton
                 size="sm"
                 variant="destructive"
                 disabled={pending}
-                onClick={() => {
-                  if (confirm(`Delete ${team.name} and all its players and scans?`)) {
-                    run(() => deleteTeam(team.id));
-                  }
-                }}
+                title={`Delete ${team.name}?`}
+                description={`Its ${team.players.length} player${team.players.length === 1 ? "" : "s"}, ${team.scans} scan${team.scans === 1 ? "" : "s"} and score of ${team.score} are deleted with it. This cannot be undone; disable the team instead if you only want to stop it playing.`}
+                confirmLabel="Delete team"
+                onConfirm={() => run(() => deleteTeam(team.id))}
               >
                 <Trash2 className="size-3.5" /> Delete team
-              </Button>
+              </ConfirmButton>
             </div>
 
             <div className="space-y-2">
               {team.players.map((p) => (
                 <div
                   key={p.id}
-                  className="flex flex-wrap items-center gap-2 rounded-md border px-3 py-2"
+                  className="flex flex-wrap items-center gap-2 rounded-md border px-3 py-2 transition-colors hover:border-foreground/20"
                 >
                   <span
                     className={`size-1.5 rounded-full shrink-0 ${p.online ? "bg-emerald-500" : "bg-muted-foreground/40"}`}
@@ -181,17 +181,18 @@ export function TeamRow({ team }: { team: TeamView }) {
                         <UserCheck className="size-3.5" />
                       )}
                     </Button>
-                    <Button
+                    <ConfirmButton
                       size="sm"
                       variant="ghost"
                       disabled={pending}
-                      title="Remove player"
-                      onClick={() => {
-                        if (confirm(`Remove ${p.name}?`)) run(() => deletePlayer(p.id));
-                      }}
+                      title={`Remove ${p.name}?`}
+                      description={`${p.name} is deleted from ${team.name} along with their scan history. Points they earned stay with the team. Disable them instead to block sign-in without losing the record.`}
+                      confirmLabel="Remove player"
+                      aria-label={`Remove ${p.name}`}
+                      onConfirm={() => run(() => deletePlayer(p.id))}
                     >
                       <Trash2 className="size-3.5" />
-                    </Button>
+                    </ConfirmButton>
                   </div>
                 </div>
               ))}

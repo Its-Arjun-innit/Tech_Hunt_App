@@ -7,6 +7,7 @@ import { GameControls } from "@/components/admin/game-controls";
 import { GameSettingsForm } from "@/components/admin/game-settings-form";
 import { RoutingWeightsForm } from "@/components/admin/routing-weights-form";
 import { GamePicker } from "@/components/admin/game-picker";
+import { PageHeader } from "@/components/admin/page-header";
 
 export const dynamic = "force-dynamic";
 
@@ -19,12 +20,7 @@ export default async function GameAdminPage() {
 
   return (
     <div className="space-y-6 max-w-3xl">
-      <div>
-        <h1 className="text-2xl font-semibold">Game controls</h1>
-        <p className="text-muted-foreground text-sm">
-          Start, pause and configure the hunt.
-        </p>
-      </div>
+      <PageHeader title="Game controls" description="Start, pause and configure the hunt." />
 
       <GamePicker games={games} currentId={game?.id ?? null} />
 

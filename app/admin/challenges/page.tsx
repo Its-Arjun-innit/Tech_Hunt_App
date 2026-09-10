@@ -3,6 +3,9 @@ import { requireAdmin } from "@/lib/auth/admin";
 import { prisma } from "@/lib/db";
 import { getCurrentGame } from "@/lib/game-engine/current-game";
 import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/admin/page-header";
+import { EmptyState } from "@/components/admin/empty-state";
+import { Puzzle } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -36,19 +39,17 @@ export default async function ChallengesPage() {
 
   return (
     <div className="space-y-6 max-w-3xl">
-      <div>
-        <h1 className="text-2xl font-semibold">Challenges</h1>
-        <p className="text-muted-foreground text-sm">
-          Each checkpoint can hold one challenge. Edit it from that checkpoint.
-        </p>
-      </div>
+      <PageHeader
+        title="Challenges"
+        description="Each checkpoint can hold one challenge. Edit it from that checkpoint."
+      />
 
       <div className="space-y-2">
         {challenges.map((c) => (
           <Link
             key={c.id}
             href={`/admin/checkpoints/${c.checkpoint.id}`}
-            className="flex flex-wrap items-center gap-3 rounded-lg border px-4 py-3 hover:bg-muted/50"
+            className="flex flex-wrap items-center gap-3 rounded-lg border px-4 py-3 outline-none transition-colors hover:bg-muted/50 hover:border-foreground/20 focus-visible:ring-3 focus-visible:ring-ring/50"
           >
             <Badge variant="secondary">{c.type.replace("_", " ")}</Badge>
             <div className="min-w-0 flex-1">
@@ -70,7 +71,11 @@ export default async function ChallengesPage() {
           </Link>
         ))}
         {challenges.length === 0 && (
-          <p className="text-sm text-muted-foreground">No challenges configured yet.</p>
+          <EmptyState
+            icon={Puzzle}
+            title="No challenges configured"
+            description="Open any checkpoint below and add a quiz, riddle, photo or physical task. Teams must finish it before receiving their next clue."
+          />
         )}
       </div>
 
@@ -82,7 +87,7 @@ export default async function ChallengesPage() {
               <Link
                 key={cp.id}
                 href={`/admin/checkpoints/${cp.id}`}
-                className="rounded-md border px-3 py-1.5 text-sm hover:bg-muted"
+                className="rounded-md border px-3 py-1.5 text-sm outline-none transition-colors hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50"
               >
                 {cp.name}
               </Link>

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Activity, Flag, QrCode, Radio, Trophy, Users } from "lucide-react";
+import { Activity, Flag, Gamepad2, QrCode, Radio, Trophy, Users } from "lucide-react";
 import { requireAdmin } from "@/lib/auth/admin";
 import { getCurrentGame } from "@/lib/game-engine/current-game";
 import { prisma } from "@/lib/db";
@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { GameTimer } from "@/components/player/game-timer";
+import { PageHeader } from "@/components/admin/page-header";
+import { EmptyState } from "@/components/admin/empty-state";
 
 export const dynamic = "force-dynamic";
 
@@ -21,11 +23,12 @@ export default async function AdminOverviewPage() {
 
   if (!game) {
     return (
-      <div className="max-w-md space-y-4">
-        <h1 className="text-2xl font-semibold">No game yet</h1>
-        <p className="text-muted-foreground">Create a game to start setting up the hunt.</p>
-        <Button render={<Link href="/admin/game" />}>Create a game</Button>
-      </div>
+      <EmptyState
+        icon={Gamepad2}
+        title="No game yet"
+        description="A game holds the teams, checkpoints and rules. Create one to begin setting up the hunt."
+        action={<Button render={<Link href="/admin/game" />}>Create a game</Button>}
+      />
     );
   }
 
@@ -55,17 +58,20 @@ export default async function AdminOverviewPage() {
 
   return (
     <div className="space-y-6 max-w-5xl">
-      <AutoRefresh seconds={8} />
+      <PageHeader
+        title={game.name}
+        description="Live overview"
+        actions={
+          <>
+            <AutoRefresh seconds={8} showIndicator />
+            <Badge variant={game.status === "ACTIVE" ? "default" : "secondary"}>
+              {game.status}
+            </Badge>
+          </>
+        }
+      />
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold">{game.name}</h1>
-          <p className="text-muted-foreground text-sm">Live overview</p>
-        </div>
-        <Badge variant={game.status === "ACTIVE" ? "default" : "secondary"}>{game.status}</Badge>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 [&>*]:h-full">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Countdown</CardTitle>
@@ -110,7 +116,16 @@ export default async function AdminOverviewPage() {
           </CardHeader>
           <CardContent className="space-y-2">
             {leaderboard.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No teams yet.</p>
+              <EmptyState
+                icon={Users}
+                title="No teams yet"
+                description="Standings appear once teams exist and start scanning."
+                action={
+                  <Button size="sm" variant="outline" render={<Link href="/admin/teams" />}>
+                    Add teams
+                  </Button>
+                }
+              />
             ) : (
               leaderboard.slice(0, 6).map((row) => (
                 <div key={row.teamId} className="flex items-center gap-3 text-sm">
@@ -132,7 +147,11 @@ export default async function AdminOverviewPage() {
           </CardHeader>
           <CardContent className="space-y-2">
             {recent.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Nothing has happened yet.</p>
+              <EmptyState
+                icon={Activity}
+                title="Nothing has happened yet"
+                description="Scans, challenges and redirects show up here as teams play."
+              />
             ) : (
               recent.map((e) => (
                 <div key={e.id} className="flex items-start gap-2 text-sm">

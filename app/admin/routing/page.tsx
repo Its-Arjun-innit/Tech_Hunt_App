@@ -4,7 +4,10 @@ import { getCurrentGame } from "@/lib/game-engine/current-game";
 import { getCheckpointTraffic, TRAFFIC_CLASS, TRAFFIC_LABEL } from "@/lib/routing/traffic";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PageHeader } from "@/components/admin/page-header";
+import { EmptyState } from "@/components/admin/empty-state";
 import { TeamRoutingRow } from "@/components/admin/team-routing-row";
+import { Users } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -39,14 +42,11 @@ export default async function RoutingPage() {
 
   return (
     <div className="space-y-6 max-w-4xl">
-      <AutoRefresh seconds={6} />
-
-      <div>
-        <h1 className="text-2xl font-semibold">Live routing</h1>
-        <p className="text-muted-foreground text-sm">
-          Where each team is and where the engine sent them next.
-        </p>
-      </div>
+      <PageHeader
+        title="Live routing"
+        description="Where each team is and where the engine sent them next."
+        actions={<AutoRefresh seconds={6} showIndicator />}
+      />
 
       <Card>
         <CardHeader className="pb-3">
@@ -54,7 +54,7 @@ export default async function RoutingPage() {
         </CardHeader>
         <CardContent className="space-y-2">
           {teams.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No teams yet.</p>
+            <EmptyState icon={Users} title="No teams yet" description="Create teams before routing can do anything." />
           ) : (
             teams.map((team) => {
               const assignment = team.assignments[0];

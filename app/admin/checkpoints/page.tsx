@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Plus, QrCode } from "lucide-react";
+import { Flag, Plus, QrCode } from "lucide-react";
 import { requireAdmin } from "@/lib/auth/admin";
 import { prisma } from "@/lib/db";
 import { getCurrentGame } from "@/lib/game-engine/current-game";
@@ -8,6 +8,8 @@ import { AutoRefresh } from "@/components/auto-refresh";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CheckpointForm } from "@/components/admin/checkpoint-form";
+import { PageHeader } from "@/components/admin/page-header";
+import { EmptyState } from "@/components/admin/empty-state";
 
 export const dynamic = "force-dynamic";
 
@@ -30,19 +32,18 @@ export default async function CheckpointsPage() {
 
   return (
     <div className="space-y-6 max-w-4xl">
-      <AutoRefresh seconds={10} />
-
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold">Checkpoints</h1>
-          <p className="text-muted-foreground text-sm">
-            {checkpoints.length} checkpoint{checkpoints.length === 1 ? "" : "s"}
-          </p>
-        </div>
-        <Button variant="outline" render={<Link href="/admin/qr" />}>
-          <QrCode className="size-4" /> QR posters
-        </Button>
-      </div>
+      <PageHeader
+        title="Checkpoints"
+        description={`${checkpoints.length} checkpoint${checkpoints.length === 1 ? "" : "s"}`}
+        actions={
+          <>
+            <AutoRefresh seconds={10} showIndicator />
+            <Button variant="outline" render={<Link href="/admin/qr" />}>
+              <QrCode className="size-4" /> QR posters
+            </Button>
+          </>
+        }
+      />
 
       <div className="space-y-2">
         {checkpoints.map((cp) => {
@@ -52,7 +53,7 @@ export default async function CheckpointsPage() {
             <Link
               key={cp.id}
               href={`/admin/checkpoints/${cp.id}`}
-              className="flex flex-wrap items-center gap-3 rounded-lg border px-4 py-3 hover:bg-muted/50"
+              className="flex flex-wrap items-center gap-3 rounded-lg border px-4 py-3 outline-none transition-colors hover:bg-muted/50 hover:border-foreground/20 focus-visible:ring-3 focus-visible:ring-ring/50"
             >
               <span
                 className={`rounded-full border px-2 py-0.5 text-xs font-medium ${TRAFFIC_CLASS[state]}`}
@@ -81,7 +82,11 @@ export default async function CheckpointsPage() {
           );
         })}
         {checkpoints.length === 0 && (
-          <p className="text-sm text-muted-foreground">No checkpoints yet. Add one below.</p>
+          <EmptyState
+            icon={Flag}
+            title="No checkpoints yet"
+            description="A checkpoint is a physical place with a QR poster. Add your first one below, then set its clues and possible next destinations."
+          />
         )}
       </div>
 

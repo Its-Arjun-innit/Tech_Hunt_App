@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { getCurrentGame } from "@/lib/game-engine/current-game";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PageHeader } from "@/components/admin/page-header";
 
 export const dynamic = "force-dynamic";
 
@@ -47,12 +48,10 @@ export default async function AuditPage({
 
   return (
     <div className="space-y-6 max-w-4xl">
-      <div>
-        <h1 className="text-2xl font-semibold">Audit log</h1>
-        <p className="text-muted-foreground text-sm">
-          Every scan attempt and admin action, newest first.
-        </p>
-      </div>
+      <PageHeader
+        title="Audit log"
+        description="Every scan attempt and admin action, newest first."
+      />
 
       <Tabs defaultValue={active}>
         <TabsList>

@@ -4,6 +4,7 @@ import { getCurrentGame } from "@/lib/game-engine/current-game";
 import { getCheckpointTraffic, TRAFFIC_CLASS, TRAFFIC_LABEL } from "@/lib/routing/traffic";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { LiveMap } from "@/components/map/live-map";
+import { PageHeader } from "@/components/admin/page-header";
 
 export const dynamic = "force-dynamic";
 
@@ -55,14 +56,11 @@ export default async function LiveMapPage() {
 
   return (
     <div className="space-y-6 max-w-5xl">
-      <AutoRefresh seconds={8} />
-
-      <div>
-        <h1 className="text-2xl font-semibold">Live game map</h1>
-        <p className="text-muted-foreground text-sm">
-          Checkpoint positions, traffic and approaching teams. Drag a marker to move a checkpoint.
-        </p>
-      </div>
+      <PageHeader
+        title="Live game map"
+        description="Checkpoint positions, traffic and approaching teams. Drag a marker to move a checkpoint."
+        actions={<AutoRefresh seconds={8} showIndicator />}
+      />
 
       <div className="flex flex-wrap gap-2 text-xs">
         {(["GREEN", "YELLOW", "RED", "GRAY"] as const).map((s) => (

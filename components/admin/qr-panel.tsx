@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Download, Printer, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { ConfirmButton } from "@/components/confirm-button";
 import { regenerateQr } from "@/app/admin/checkpoints/actions";
 
 export function QrPanel({
@@ -55,26 +56,26 @@ export function QrPanel({
           <Button variant="outline" size="sm" render={<a href="/admin/qr" />}>
             <Printer className="size-3.5" /> Print posters
           </Button>
-          <Button
+          <ConfirmButton
             variant="destructive"
             size="sm"
             disabled={pending}
-            onClick={() => {
-              if (
-                !confirm(
-                  "Issue a new QR code? The printed poster stops working immediately.",
-                )
+            title="Issue a new QR code?"
+            description="The poster already taped up at this checkpoint stops working the moment you confirm. Only do this if the current code has leaked, and reprint before the game restarts."
+            confirmLabel="Regenerate code"
+            onConfirm={() =>
+              new Promise<void>((resolve) =>
+                startTransition(async () => {
+                  const result = await regenerateQr(checkpointId);
+                  toast[result.ok ? "success" : "error"](result.message);
+                  router.refresh();
+                  resolve();
+                }),
               )
-                return;
-              startTransition(async () => {
-                const result = await regenerateQr(checkpointId);
-                toast[result.ok ? "success" : "error"](result.message);
-                router.refresh();
-              });
-            }}
+            }
           >
             <RefreshCw className="size-3.5" /> Regenerate
-          </Button>
+          </ConfirmButton>
         </div>
       </div>
     </div>

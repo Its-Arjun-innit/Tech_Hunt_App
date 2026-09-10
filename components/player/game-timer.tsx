@@ -22,6 +22,12 @@ export function GameTimer({
   endsAt: string | null;
 }) {
   const [now, setNow] = useState(() => Date.now());
+  // Elapsed time differs between the server render and the client, so the
+  // clock only appears once mounted. Without this every page carrying a timer
+  // throws a hydration error.
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
 
   useEffect(() => {
     if (status !== "ACTIVE") return;
@@ -31,6 +37,9 @@ export function GameTimer({
 
   if (status === "ENDED") {
     return <p className="text-2xl font-semibold tabular-nums">Finished</p>;
+  }
+  if (!mounted) {
+    return <p className="text-2xl font-semibold tabular-nums text-muted-foreground">--:--</p>;
   }
   if (!startsAt) {
     return <p className="text-sm text-muted-foreground">Waiting for the organizer to start.</p>;

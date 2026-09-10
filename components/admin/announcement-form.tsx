@@ -44,8 +44,11 @@ export function AnnouncementForm({ teams }: { teams: { id: string; name: string 
               key={t.id}
               type="button"
               onClick={() => toggle(t.id)}
-              className={`rounded-full border px-3 py-1 text-sm ${
-                selected.has(t.id) ? "border-primary bg-primary/10" : "hover:bg-muted"
+              aria-pressed={selected.has(t.id)}
+              className={`rounded-full border px-3 py-1 text-sm outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/50 ${
+                selected.has(t.id)
+                  ? "border-primary bg-primary/10 font-medium"
+                  : "hover:bg-muted hover:border-foreground/20"
               }`}
             >
               {t.name}

@@ -1,28 +1,19 @@
-import Link from "next/link";
-import {
-  Bell, ClipboardList, Flag, Gamepad2, LayoutDashboard, Map, Puzzle,
-  QrCode, Route, ShieldCheck, Users,
-} from "lucide-react";
+import { ShieldCheck } from "lucide-react";
 import { getAdmin } from "@/lib/auth/admin";
 import { getCurrentGame } from "@/lib/game-engine/current-game";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { AdminNav } from "@/components/admin/admin-nav";
 import { adminLogout } from "./login/actions";
 
 export const metadata = { title: "Admin — Campus Treasure Hunt" };
 
-const NAV = [
-  { href: "/admin", label: "Overview", icon: LayoutDashboard },
-  { href: "/admin/game", label: "Game controls", icon: Gamepad2 },
-  { href: "/admin/teams", label: "Teams & players", icon: Users },
-  { href: "/admin/checkpoints", label: "Checkpoints", icon: Flag },
-  { href: "/admin/map", label: "Live map", icon: Map },
-  { href: "/admin/routing", label: "Routing", icon: Route },
-  { href: "/admin/challenges", label: "Challenges", icon: Puzzle },
-  { href: "/admin/qr", label: "QR posters", icon: QrCode },
-  { href: "/admin/announcements", label: "Announcements", icon: Bell },
-  { href: "/admin/audit", label: "Audit log", icon: ClipboardList },
-];
+const STATUS_CLASS: Record<string, string> = {
+  ACTIVE: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30",
+  PAUSED: "bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30",
+  ENDED: "bg-muted text-muted-foreground",
+  DRAFT: "bg-muted text-muted-foreground",
+};
 
 export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
   const admin = await getAdmin();
@@ -34,33 +25,34 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
 
   return (
     <div className="flex-1 flex flex-col lg:flex-row">
-      <aside className="lg:w-60 lg:shrink-0 border-b lg:border-b-0 lg:border-r lg:min-h-screen">
+      {/* flex-col so sign-out can sit at the bottom; sticky so the nav
+          survives long pages such as the audit log. */}
+      <aside className="lg:w-60 lg:shrink-0 flex flex-col border-b lg:border-b-0 lg:border-r lg:sticky lg:top-0 lg:h-screen">
         <div className="px-4 py-4 border-b">
           <div className="flex items-center gap-2 font-semibold">
             <ShieldCheck className="size-5" /> Organizer
           </div>
-          <p className="text-xs text-muted-foreground mt-1 truncate">{admin.email}</p>
+          <p className="text-xs text-muted-foreground mt-1 truncate" title={admin.email}>
+            {admin.email}
+          </p>
           {game && (
-            <Badge variant="outline" className="mt-2 text-xs font-normal">
-              {game.name} · {game.status}
-            </Badge>
+            <div className="mt-2 space-y-1">
+              <p className="text-xs font-medium truncate" title={game.name}>
+                {game.name}
+              </p>
+              <Badge
+                variant="outline"
+                className={`text-xs font-normal ${STATUS_CLASS[game.status] ?? ""}`}
+              >
+                {game.status}
+              </Badge>
+            </div>
           )}
         </div>
 
-        <nav className="p-2 flex lg:flex-col gap-1 overflow-x-auto">
-          {NAV.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="flex items-center gap-2 rounded-md px-3 py-2 text-sm whitespace-nowrap hover:bg-muted"
-            >
-              <item.icon className="size-4 shrink-0" />
-              {item.label}
-            </Link>
-          ))}
-        </nav>
+        <AdminNav />
 
-        <div className="p-2 lg:mt-auto">
+        <div className="p-2 mt-auto border-t lg:border-t-0">
           <form action={adminLogout}>
             <Button variant="ghost" size="sm" type="submit" className="w-full justify-start">
               Sign out
