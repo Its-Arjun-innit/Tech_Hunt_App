@@ -1,0 +1,442 @@
+// Campus Treasure Hunt — data model.
+// Source of truth for all game state. Never trust the client.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─────────────────────────────── Game ───────────────────────────────
+
+enum GameStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  ENDED
+}
+
+enum ClueUnlockMode {
+  TIME
+  REQUEST
+  BOTH
+}
+
+model Game {
+  id                      String         @id @default(cuid())
+  name                    String
+  status                  GameStatus     @default(DRAFT)
+  startsAt                DateTime?
+  endsAt                  DateTime?
+  scoringFrozen           Boolean        @default(false)
+  scansLocked             Boolean        @default(false)
+  /// When true a team may only score at the checkpoint it was routed to.
+  enforceRouting          Boolean        @default(true)
+  /// Hide score changes newer than this many seconds on the public leaderboard.
+  leaderboardDelaySeconds Int            @default(0)
+  clueUnlockMode          ClueUnlockMode @default(BOTH)
+  /// Seconds before the next clue level unlocks on its own.
+  clueUnlockAfterSeconds  Int            @default(300)
+  /// Points deducted when a team asks for a clearer clue.
+  clueRequestCost         Int            @default(10)
+  /// Overrides for ROUTING_CONFIG defaults; see lib/routing/config.ts
+  routingConfig           Json?
+  createdAt               DateTime       @default(now())
+  updatedAt               DateTime       @updatedAt
+
+  teams         Team[]
+  checkpoints   Checkpoint[]
+  announcements Announcement[]
+  events        GameEvent[]
+  auditLogs     AuditLog[]
+}
+
+// ─────────────────────────── Teams & players ────────────────────────
+
+enum TeamStatus {
+  ACTIVE
+  DISABLED
+  FINISHED
+}
+
+model Team {
+  id        String     @id @default(cuid())
+  gameId    String
+  name      String
+  code      String
+  /// Cached sum of ScoreEvent.points. ScoreEvent remains the source of truth.
+  score     Int        @default(0)
+  status    TeamStatus @default(ACTIVE)
+  finalRank Int?
+
+  currentCheckpointId String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  game              Game                @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  currentCheckpoint Checkpoint?         @relation("TeamCurrentCheckpoint", fields: [currentCheckpointId], references: [id], onDelete: SetNull)
+  players           Player[]
+  scanEvents        ScanEvent[]
+  scoreEvents       ScoreEvent[]
+  assignments       RoutingAssignment[]
+  attempts          ChallengeAttempt[]
+  events            GameEvent[]
+
+  @@unique([gameId, name])
+  @@unique([gameId, code])
+  @@index([gameId, score])
+}
+
+enum PlayerStatus {
+  ACTIVE
+  DISABLED
+}
+
+model Player {
+  id           String       @id @default(cuid())
+  teamId       String
+  memberCode   String
+  pinHash      String
+  name         String
+  status       PlayerStatus @default(ACTIVE)
+  lastLoginAt  DateTime?
+  lastActiveAt DateTime?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  team       Team        @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  sessions   Session[]
+  scanEvents ScanEvent[]
+
+  @@unique([teamId, memberCode])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  playerId  String
+  expiresAt DateTime
+  userAgent String?
+  ip        String?
+  createdAt DateTime @default(now())
+
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@index([playerId])
+}
+
+// ─────────────────────────── Admin & volunteers ─────────────────────
+
+enum AdminRole {
+  SUPER_ADMIN
+  GAME_ADMIN
+  VOLUNTEER
+}
+
+model AdminUser {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  name         String
+  passwordHash String
+  role         AdminRole @default(VOLUNTEER)
+  active       Boolean   @default(true)
+  /// Volunteers are usually posted at one checkpoint.
+  checkpointId String?
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  checkpoint       Checkpoint?        @relation(fields: [checkpointId], references: [id], onDelete: SetNull)
+  sessions         AdminSession[]
+  verifiedAttempts ChallengeAttempt[]
+}
+
+model AdminSession {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  adminId   String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  admin AdminUser @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([adminId])
+}
+
+// ───────────────────────────── Checkpoints ──────────────────────────
+
+model Checkpoint {
+  id          String   @id @default(cuid())
+  gameId      String
+  name        String
+  description String?
+  /// Opaque public token embedded in the QR code, e.g. cp_x8k29fq2mz
+  qrToken     String   @unique
+  latitude    Float
+  longitude   Float
+  points      Int      @default(50)
+  /// Teams that can be present at once before the checkpoint counts as RED.
+  capacity    Int      @default(2)
+  active      Boolean  @default(true)
+  routeGroup  String?
+  /// 1 (easy) .. 5 (hard). Used by the routing engine difficulty fit.
+  difficulty  Int      @default(3)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  game        Game                @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  clues       Clue[]
+  challenge   Challenge?
+  scanEvents  ScanEvent[]
+  routesFrom  CheckpointRoute[]   @relation("RouteFrom")
+  routesTo    CheckpointRoute[]   @relation("RouteTo")
+  assignments RoutingAssignment[]
+  teamsHere   Team[]              @relation("TeamCurrentCheckpoint")
+  volunteers  AdminUser[]
+
+  @@index([gameId, active])
+}
+
+/// Allowed next checkpoints. The routing engine picks one of these per team.
+model CheckpointRoute {
+  id     String @id @default(cuid())
+  fromId String
+  toId   String
+
+  from Checkpoint @relation("RouteFrom", fields: [fromId], references: [id], onDelete: Cascade)
+  to   Checkpoint @relation("RouteTo", fields: [toId], references: [id], onDelete: Cascade)
+
+  @@unique([fromId, toId])
+  @@index([fromId])
+}
+
+/// Clues describe how to reach the checkpoint they belong to.
+/// Level 1 is cryptic; higher levels get progressively clearer.
+model Clue {
+  id           String @id @default(cuid())
+  checkpointId String
+  level        Int
+  text         String
+
+  checkpoint  Checkpoint          @relation(fields: [checkpointId], references: [id], onDelete: Cascade)
+  assignments RoutingAssignment[]
+
+  @@unique([checkpointId, level])
+}
+
+// ───────────────────────────── Challenges ───────────────────────────
+
+enum ChallengeType {
+  QR
+  QUIZ
+  PUZZLE
+  RIDDLE
+  PHYSICAL
+  PHOTO
+  MULTI_STAGE
+}
+
+model Challenge {
+  id               String        @id @default(cuid())
+  checkpointId     String        @unique
+  type             ChallengeType
+  title            String
+  prompt           String
+  points           Int           @default(50)
+  maxAttempts      Int           @default(3)
+  timeLimitSeconds Int?
+  penaltyPoints    Int           @default(0)
+  /// Type-specific payload validated by lib/challenges/schemas.ts
+  config           Json
+  active           Boolean       @default(true)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  checkpoint Checkpoint         @relation(fields: [checkpointId], references: [id], onDelete: Cascade)
+  attempts   ChallengeAttempt[]
+}
+
+enum AttemptStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+model ChallengeAttempt {
+  id            String        @id @default(cuid())
+  teamId        String
+  challengeId   String
+  status        AttemptStatus @default(PENDING)
+  /// Submitted answer / photo / stage payload.
+  payload       Json?
+  stageIndex    Int           @default(0)
+  pointsAwarded Int           @default(0)
+  verifiedById  String?
+  note          String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  team       Team       @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  challenge  Challenge  @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  verifiedBy AdminUser? @relation(fields: [verifiedById], references: [id], onDelete: SetNull)
+
+  @@index([teamId, challengeId])
+  @@index([status])
+}
+
+// ─────────────────────────── Scans & scoring ────────────────────────
+
+enum ScanResult {
+  SUCCESS
+  DUPLICATE
+  INVALID_TOKEN
+  INACTIVE_CHECKPOINT
+  WRONG_CHECKPOINT
+  GAME_NOT_ACTIVE
+  TEAM_DISABLED
+  RATE_LIMITED
+}
+
+/// Immutable audit record of every scan attempt, successful or not.
+model ScanEvent {
+  id            String     @id @default(cuid())
+  teamId        String
+  playerId      String
+  checkpointId  String?
+  result        ScanResult
+  pointsAwarded Int        @default(0)
+  /// Human-readable routing decision produced for this scan.
+  routingReason String?
+  ip            String?
+  userAgent     String?
+  createdAt     DateTime   @default(now())
+
+  team       Team        @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  player     Player      @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  checkpoint Checkpoint? @relation(fields: [checkpointId], references: [id], onDelete: SetNull)
+
+  @@index([teamId, checkpointId, result])
+  @@index([playerId, createdAt])
+  @@index([createdAt])
+}
+
+enum ScoreEventType {
+  CHECKPOINT
+  CHALLENGE
+  CLUE_COST
+  PENALTY
+  ADMIN_ADJUSTMENT
+}
+
+/// Append-only ledger. Team.score is a cached sum of these rows.
+model ScoreEvent {
+  id        String         @id @default(cuid())
+  teamId    String
+  type      ScoreEventType
+  points    Int
+  /// Id of the checkpoint / challenge / attempt this refers to.
+  refId     String?
+  note      String?
+  createdAt DateTime       @default(now())
+
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@index([teamId, createdAt])
+}
+
+// ────────────────────── Routing & soft reservations ─────────────────
+
+enum AssignmentStatus {
+  ACTIVE
+  COMPLETED
+  EXPIRED
+  CANCELLED
+}
+
+/// An ACTIVE, unexpired assignment doubles as the soft reservation that tells
+/// the routing engine a team is already approaching this checkpoint.
+model RoutingAssignment {
+  id                  String           @id @default(cuid())
+  teamId              String
+  checkpointId        String
+  fromCheckpointId    String?
+  status              AssignmentStatus @default(ACTIVE)
+  score               Float            @default(0)
+  /// Why the engine picked this checkpoint; shown in the admin routing view.
+  reason              String?
+  estimatedTravelTime Int              @default(0)
+  clueId              String?
+  clueLevel           Int              @default(1)
+  clueUnlockedAt      DateTime         @default(now())
+  expiresAt           DateTime
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  team       Team       @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  checkpoint Checkpoint @relation(fields: [checkpointId], references: [id], onDelete: Cascade)
+  clue       Clue?      @relation(fields: [clueId], references: [id], onDelete: SetNull)
+
+  @@index([checkpointId, status, expiresAt])
+  @@index([teamId, status])
+}
+
+// ──────────────────────── Comms, events, audit ──────────────────────
+
+model Announcement {
+  id        String   @id @default(cuid())
+  gameId    String
+  message   String
+  /// Empty means broadcast to every team.
+  teamIds   String[] @default([])
+  createdAt DateTime @default(now())
+
+  game Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  @@index([gameId, createdAt])
+}
+
+/// Player-visible activity feed plus admin overview stream.
+model GameEvent {
+  id        String   @id @default(cuid())
+  gameId    String
+  teamId    String?
+  type      String
+  message   String
+  meta      Json?
+  createdAt DateTime @default(now())
+
+  game Game  @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  team Team? @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@index([gameId, createdAt])
+  @@index([teamId, createdAt])
+}
+
+enum ActorType {
+  ADMIN
+  PLAYER
+  SYSTEM
+}
+
+model AuditLog {
+  id        String    @id @default(cuid())
+  gameId    String?
+  actorType ActorType
+  actorId   String?
+  actorName String?
+  action    String
+  entity    String?
+  entityId  String?
+  meta      Json?
+  ip        String?
+  createdAt DateTime  @default(now())
+
+  game Game? @relation(fields: [gameId], references: [id], onDelete: SetNull)
+
+  @@index([gameId, createdAt])
+  @@index([action])
+}
