@@ -30,10 +30,28 @@ export function generatePin(): string {
   return String(randomInt(0, 1_000_000)).padStart(6, "0");
 }
 
+/**
+ * Public origin the QR posters point at.
+ *
+ * Only ever read on the server, so it needs no NEXT_PUBLIC_ prefix. On Vercel
+ * the production URL is provided automatically, which means a deployment
+ * prints working posters even when nobody configured an origin. Getting this
+ * wrong is expensive: posters are printed and taped to walls, and a localhost
+ * URL cannot be scanned by any phone.
+ */
+export function appUrl(): string {
+  const configured = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL;
+  if (configured) return configured.replace(/\/$/, "");
+
+  const vercel = process.env.VERCEL_PROJECT_PRODUCTION_URL;
+  if (vercel) return `https://${vercel.replace(/^https?:\/\//, "").replace(/\/$/, "")}`;
+
+  return "http://localhost:3000";
+}
+
 /** URL encoded into a checkpoint QR poster. */
 export function scanUrl(token: string): string {
-  const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-  return `${base.replace(/\/$/, "")}/scan/${token}`;
+  return `${appUrl()}/scan/${token}`;
 }
 
 /** Accepts a full scan URL or a bare token and returns the token. */

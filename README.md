@@ -53,10 +53,9 @@ Change `ADMIN_PASSWORD` in `.env` before deploying anywhere real.
 
 | Variable | Required | Purpose |
 | --- | --- | --- |
-| `DATABASE_URL` | yes | Pooled connection. On Supabase use the port 6543 pgBouncer string. |
-| `DIRECT_URL` | yes | Direct connection on port 5432, used for migrations. |
-| `AUTH_SECRET` | yes | Random 32+ character string. |
-| `NEXT_PUBLIC_APP_URL` | yes | Public origin. Encoded into every checkpoint QR code. |
+| `DATABASE_URL` | yes | Pooled connection. On Supabase use the port 6543 pgBouncer string. Vercel's Supabase and Neon integrations supply this as `POSTGRES_PRISMA_URL`, which is accepted automatically. |
+| `DIRECT_URL` | no | Direct connection on port 5432, used for migrations. Falls back to `DATABASE_URL`. |
+| `APP_URL` | no | Public origin encoded into every checkpoint QR code. Derived automatically on Vercel; set it elsewhere. |
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | seed only | Seeds the first super admin. |
 | `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` | no | Browser key. Without it the admin map falls back to a coordinate grid. |
 | `GOOGLE_MAPS_API_KEY` | no | Server key, only needed if you add geocoding. |
@@ -72,9 +71,14 @@ Never commit `.env`. `.env.example` is the template that is committed.
 settings. Use the pooled string for `DATABASE_URL` and the direct one for
 `DIRECT_URL`.
 
-**Vercel.** Import the GitHub repository, add every variable above, and deploy.
-`prisma generate` runs automatically on install. Apply migrations once from your
-machine with `npx prisma migrate deploy` pointed at the production database.
+**Vercel.** Import the GitHub repository, set `ADMIN_EMAIL` and `ADMIN_PASSWORD`, and
+deploy. Attaching Postgres from the Storage tab is enough to supply the connection,
+with no prefix. The build applies every pending migration and creates the first super
+admin from those two variables, so a fresh deployment is ready to sign in to. Both
+steps are idempotent and safe on every redeploy.
+
+Do not use Prisma Postgres. It issues a `prisma+postgres://` URL that requires the
+Accelerate extension this app does not use; the build refuses it with an explanation.
 
 **Google Maps.** Enable the Maps JavaScript API and Places API. Restrict the browser
 key by HTTP referrer to your Vercel domain. The application works without a key.
