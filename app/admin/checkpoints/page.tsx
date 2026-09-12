@@ -4,7 +4,7 @@ import { requireAdmin } from "@/lib/auth/admin";
 import { prisma } from "@/lib/db";
 import { getCurrentGame } from "@/lib/game-engine/current-game";
 import { getCheckpointTraffic } from "@/lib/routing/traffic";
-import { TrafficBadge } from "@/components/status-badge";
+import { CheckpointsTable } from "@/components/admin/checkpoints-table";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -46,46 +46,35 @@ export default async function CheckpointsPage() {
         }
       />
 
-      <div className="space-y-2">
-        {checkpoints.map((cp) => {
-          const t = traffic.get(cp.id);
-          const state = t?.state ?? "GREEN";
-          return (
-            <Link
-              key={cp.id}
-              href={`/admin/checkpoints/${cp.id}`}
-              className="flex flex-wrap items-center gap-3 rounded-lg border px-4 py-3 outline-none transition-colors hover:bg-muted/50 hover:border-foreground/20 focus-visible:ring-3 focus-visible:ring-ring/50"
-            >
-              <TrafficBadge state={state} />
-              <div className="min-w-0 flex-1">
-                <p className="font-medium truncate">{cp.name}</p>
-                <p className="text-xs text-muted-foreground truncate">
-                  {cp.points} pts · capacity {cp.capacity} · difficulty {cp.difficulty}
-                  {cp.routeGroup && ` · ${cp.routeGroup}`}
-                  {cp.challenge && ` · ${cp.challenge.type.replace("_", " ")}`}
-                </p>
-              </div>
-              <span className="text-xs text-muted-foreground">
-                {cp._count.clues} clue{cp._count.clues === 1 ? "" : "s"} ·{" "}
-                {cp._count.routesFrom} route{cp._count.routesFrom === 1 ? "" : "s"} ·{" "}
-                {cp._count.scanEvents} scans
-              </span>
-              {t && (t.occupancy > 0 || t.approaching > 0) && (
-                <span className="text-xs text-muted-foreground">
-                  {t.occupancy} here / {t.approaching} coming
-                </span>
-              )}
-            </Link>
-          );
-        })}
-        {checkpoints.length === 0 && (
-          <EmptyState
-            icon={Flag}
-            title="No checkpoints yet"
-            description="A checkpoint is a physical place with a QR poster. Add your first one below, then set its clues and possible next destinations."
-          />
-        )}
-      </div>
+      {checkpoints.length === 0 ? (
+        <EmptyState
+          icon={Flag}
+          title="No checkpoints yet"
+          description="A checkpoint is a physical place with a QR poster. Add your first one below, then set its clues and possible next destinations."
+        />
+      ) : (
+        <CheckpointsTable
+          rows={checkpoints.map((cp) => {
+            const t = traffic.get(cp.id);
+            return {
+              id: cp.id,
+              name: cp.name,
+              routeGroup: cp.routeGroup,
+              points: cp.points,
+              capacity: cp.capacity,
+              difficulty: cp.difficulty,
+              active: cp.active,
+              clues: cp._count.clues,
+              routes: cp._count.routesFrom,
+              scans: cp._count.scanEvents,
+              challenge: cp.challenge?.type ?? null,
+              state: t?.state ?? "GREEN",
+              occupancy: t?.occupancy ?? 0,
+              approaching: t?.approaching ?? 0,
+            };
+          })}
+        />
+      )}
 
       <Card>
         <CardHeader className="pb-3">

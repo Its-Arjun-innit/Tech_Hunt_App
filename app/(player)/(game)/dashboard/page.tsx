@@ -1,8 +1,9 @@
 import { Bell, Flag, Puzzle } from "lucide-react";
 import { requirePlayer } from "@/lib/auth/player";
 import { prisma } from "@/lib/db";
-import { currentObjective } from "@/lib/game-engine/clues";
+import { currentTask } from "@/lib/game-engine/clues";
 import { getLeaderboard } from "@/lib/scoring/leaderboard";
+import { visibleToTeam } from "@/lib/announcements";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { PlayerHeader } from "@/components/player/player-header";
 import { ObjectiveCard } from "@/components/player/objective-card";
@@ -13,9 +14,9 @@ export const dynamic = "force-dynamic";
 export default async function DashboardPage() {
   const { team, game } = await requirePlayer();
 
-  const [objective, completedScans, challengeCount, leaderboard, announcements, totalCheckpoints] =
+  const [task, completedScans, challengeCount, leaderboard, announcements, totalCheckpoints] =
     await Promise.all([
-      currentObjective(team.id),
+      currentTask(team.id),
       prisma.scanEvent.count({ where: { teamId: team.id, result: "SUCCESS" } }),
       prisma.challengeAttempt.count({ where: { teamId: team.id, status: "SUCCESS" } }),
       getLeaderboard(game.id),
@@ -28,13 +29,9 @@ export default async function DashboardPage() {
     ]);
 
   const rank = leaderboard.find((r) => r.teamId === team.id)?.rank ?? leaderboard.length;
-  const mine = announcements.filter(
-    (a) => a.teamIds.length === 0 || a.teamIds.includes(team.id),
-  );
-
-  const pendingChallenge = objective?.checkpoint.challenge?.active
-    ? objective.checkpoint.challenge
-    : null;
+  // Audience and scheduling are both decided by one helper, so the player and
+  // volunteer surfaces cannot drift apart on who sees what.
+  const mine = announcements.filter((a) => visibleToTeam(a, team.id));
 
   return (
     <main className="flex-1">
@@ -55,23 +52,15 @@ export default async function DashboardPage() {
 
         <ObjectiveCard
           objective={
-            pendingChallenge
+            task.kind === "travel"
               ? {
-                  kind: "challenge",
-                  challengeId: pendingChallenge.id,
-                  title: pendingChallenge.title,
+                  kind: "travel",
+                  clue: task.clue ?? "Awaiting your next destination.",
+                  level: task.level,
+                  maxLevel: task.maxLevel,
+                  etaSeconds: task.etaSeconds,
                 }
-              : objective
-                ? {
-                    kind: "travel",
-                    clue: objective.clue?.text ?? "Awaiting your next destination.",
-                    level: objective.level,
-                    maxLevel: objective.maxLevel,
-                    etaSeconds: objective.estimatedTravelTime,
-                  }
-                : completedScans > 0
-                  ? { kind: "finished" }
-                  : { kind: "first-scan" }
+              : task
           }
         />
 

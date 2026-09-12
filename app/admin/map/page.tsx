@@ -14,7 +14,7 @@ export default async function LiveMapPage() {
   const game = await getCurrentGame();
   if (!game) return <p className="text-muted-foreground">Create a game first.</p>;
 
-  const [checkpoints, traffic, volunteers] = await Promise.all([
+  const [checkpoints, traffic, volunteers, teams] = await Promise.all([
     prisma.checkpoint.findMany({
       where: { gameId: game.id },
       include: {
@@ -30,6 +30,11 @@ export default async function LiveMapPage() {
     prisma.adminUser.findMany({
       where: { role: "VOLUNTEER", active: true, checkpointId: { not: null } },
       select: { id: true, name: true, checkpointId: true },
+    }),
+    prisma.team.findMany({
+      where: { gameId: game.id, status: "ACTIVE" },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
     }),
   ]);
 
@@ -48,6 +53,7 @@ export default async function LiveMapPage() {
       latitude: cp.latitude,
       longitude: cp.longitude,
       state: t?.state ?? ("GREEN" as const),
+      active: cp.active,
       teamsHere: cp.teamsHere.map((t) => t.name),
       approachingTeams: cp.assignments.map((a) => a.team.name),
       capacity: cp.capacity,
@@ -69,7 +75,11 @@ export default async function LiveMapPage() {
         ))}
       </div>
 
-      <LiveMap apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? ""} points={points} />
+      <LiveMap
+        apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? ""}
+        points={points}
+        teams={teams}
+      />
     </div>
   );
 }

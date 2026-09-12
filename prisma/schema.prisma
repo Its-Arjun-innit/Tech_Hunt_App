@@ -386,13 +386,24 @@ model RoutingAssignment {
 
 // ──────────────────────── Comms, events, audit ──────────────────────
 
+enum AnnouncementAudience {
+  ALL_TEAMS
+  SELECTED_TEAMS
+  VOLUNTEERS
+  ADMINS
+}
+
 model Announcement {
-  id        String   @id @default(cuid())
+  id        String               @id @default(cuid())
   gameId    String
   message   String
-  /// Empty means broadcast to every team.
-  teamIds   String[] @default([])
-  createdAt DateTime @default(now())
+  audience  AnnouncementAudience @default(ALL_TEAMS)
+  /// Only meaningful when audience is SELECTED_TEAMS.
+  teamIds   String[]             @default([])
+  /// Future-dated announcements stay hidden until this passes. Compared at
+  /// read time, like reservation expiry, so no scheduler is needed.
+  scheduledFor DateTime?
+  createdAt DateTime             @default(now())
 
   game Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
 

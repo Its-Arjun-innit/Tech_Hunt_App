@@ -114,3 +114,69 @@ export async function currentObjective(teamId: string) {
     estimatedTravelTime: assignment.estimatedTravelTime,
   };
 }
+
+export type CurrentTask =
+  | { kind: "challenge"; challengeId: string; title: string; checkpointName: string }
+  | {
+      kind: "travel";
+      clue: string | null;
+      level: number;
+      maxLevel: number;
+      etaSeconds: number;
+      checkpointName: string;
+    }
+  | { kind: "first-scan" }
+  | { kind: "finished" };
+
+/**
+ * What this team should be doing right now.
+ *
+ * A team that scans a checkpoint carrying a challenge gets no routing
+ * assignment until the challenge resolves, so "no assignment" on its own does
+ * not mean finished. Reading it that way told a team mid-game that it had
+ * completed everything, which is why this lives in one place that every
+ * player surface calls rather than being re-derived per page.
+ */
+export async function currentTask(teamId: string): Promise<CurrentTask> {
+  const objective = await currentObjective(teamId);
+  if (objective) {
+    return {
+      kind: "travel",
+      clue: objective.clue?.text ?? null,
+      level: objective.level,
+      maxLevel: objective.maxLevel,
+      etaSeconds: objective.estimatedTravelTime,
+      checkpointName: objective.checkpoint.name,
+    };
+  }
+
+  // No destination: are they held at a challenge where they stand?
+  const team = await prisma.team.findUnique({
+    where: { id: teamId },
+    select: {
+      currentCheckpointId: true,
+      currentCheckpoint: {
+        select: { name: true, challenge: { select: { id: true, title: true, active: true } } },
+      },
+    },
+  });
+
+  const challenge = team?.currentCheckpoint?.challenge;
+  if (challenge?.active) {
+    const done = await prisma.challengeAttempt.findFirst({
+      where: { teamId, challengeId: challenge.id, status: "SUCCESS" },
+      select: { id: true },
+    });
+    if (!done) {
+      return {
+        kind: "challenge",
+        challengeId: challenge.id,
+        title: challenge.title,
+        checkpointName: team!.currentCheckpoint!.name,
+      };
+    }
+  }
+
+  const scans = await prisma.scanEvent.count({ where: { teamId, result: "SUCCESS" } });
+  return scans > 0 ? { kind: "finished" } : { kind: "first-scan" };
+}

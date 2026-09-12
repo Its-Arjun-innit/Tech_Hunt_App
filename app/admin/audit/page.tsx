@@ -1,27 +1,24 @@
+import { ClipboardList } from "lucide-react";
 import { requireAdmin } from "@/lib/auth/admin";
 import { prisma } from "@/lib/db";
 import { getCurrentGame } from "@/lib/game-engine/current-game";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PageHeader } from "@/components/admin/page-header";
+import { EmptyState } from "@/components/admin/empty-state";
+import { AuditLog } from "@/components/admin/audit-log";
 
 export const dynamic = "force-dynamic";
 
-const RESULT_CLASS: Record<string, string> = {
-  SUCCESS: "bg-success-subtle text-success-strong",
-  DUPLICATE: "bg-warning-subtle text-warning-foreground dark:text-warning",
-  RATE_LIMITED: "bg-warning-subtle text-warning-foreground dark:text-warning",
-};
-
-export default async function AuditPage({
-  searchParams,
-}: PageProps<"/admin/audit">) {
+export default async function AuditPage({ searchParams }: PageProps<"/admin/audit">) {
   await requireAdmin();
   const game = await getCurrentGame();
-  if (!game) return <p className="text-muted-foreground">Create a game first.</p>;
+  if (!game) {
+    return (
+      <EmptyState icon={ClipboardList} title="No game yet" description="Create a game first." />
+    );
+  }
 
   const { tab } = await searchParams;
-  const active = typeof tab === "string" ? tab : "scans";
+  const defaultTab = typeof tab === "string" ? tab : "scans";
 
   const [scans, logs, events] = await Promise.all([
     prisma.scanEvent.findMany({
@@ -32,112 +29,54 @@ export default async function AuditPage({
         checkpoint: { select: { name: true } },
       },
       orderBy: { createdAt: "desc" },
-      take: 100,
+      take: 200,
     }),
     prisma.auditLog.findMany({
       where: { OR: [{ gameId: game.id }, { gameId: null }] },
       orderBy: { createdAt: "desc" },
-      take: 100,
+      take: 200,
     }),
     prisma.gameEvent.findMany({
       where: { gameId: game.id },
       orderBy: { createdAt: "desc" },
-      take: 100,
+      take: 200,
     }),
   ]);
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="max-w-5xl space-y-6">
       <PageHeader
         title="Audit log"
-        description="Every scan attempt and admin action, newest first."
+        description="Every scan attempt, including rejections, and every admin action. This is what disputes get settled from."
       />
 
-      <Tabs defaultValue={active}>
-        <TabsList>
-          <TabsTrigger value="scans">Scans</TabsTrigger>
-          <TabsTrigger value="admin">Admin actions</TabsTrigger>
-          <TabsTrigger value="events">Game events</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="scans" className="space-y-1.5 pt-4">
-          {scans.map((s) => (
-            <div
-              key={s.id}
-              className="flex flex-wrap items-center gap-2 rounded-md border px-3 py-2 text-sm"
-            >
-              <span className="text-xs text-muted-foreground tabular-nums shrink-0">
-                {s.createdAt.toLocaleTimeString([], {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                  second: "2-digit",
-                })}
-              </span>
-              <Badge
-                variant="outline"
-                className={`text-xs ${RESULT_CLASS[s.result] ?? "text-muted-foreground"}`}
-              >
-                {s.result.replace("_", " ").toLowerCase()}
-              </Badge>
-              <span className="font-medium">{s.team.name}</span>
-              <span className="text-muted-foreground">/ {s.player.name}</span>
-              <span className="truncate">{s.checkpoint?.name ?? "unknown checkpoint"}</span>
-              {s.pointsAwarded > 0 && (
-                <span className="text-success-strong font-medium">+{s.pointsAwarded}</span>
-              )}
-              {s.ip && <span className="ml-auto text-xs text-muted-foreground">{s.ip}</span>}
-            </div>
-          ))}
-          {scans.length === 0 && (
-            <p className="text-sm text-muted-foreground">No scans recorded yet.</p>
-          )}
-        </TabsContent>
-
-        <TabsContent value="admin" className="space-y-1.5 pt-4">
-          {logs.map((l) => (
-            <div
-              key={l.id}
-              className="flex flex-wrap items-center gap-2 rounded-md border px-3 py-2 text-sm"
-            >
-              <span className="text-xs text-muted-foreground tabular-nums shrink-0">
-                {l.createdAt.toLocaleString()}
-              </span>
-              <Badge variant="secondary" className="text-xs">
-                {l.actorType.toLowerCase()}
-              </Badge>
-              <span className="font-medium">{l.action.replace(/_/g, " ").toLowerCase()}</span>
-              {l.actorName && (
-                <span className="text-muted-foreground truncate">by {l.actorName}</span>
-              )}
-              {l.entity && (
-                <span className="text-xs text-muted-foreground">
-                  {l.entity} {l.entityId?.slice(0, 8)}
-                </span>
-              )}
-            </div>
-          ))}
-          {logs.length === 0 && (
-            <p className="text-sm text-muted-foreground">No admin actions recorded yet.</p>
-          )}
-        </TabsContent>
-
-        <TabsContent value="events" className="space-y-1.5 pt-4">
-          {events.map((e) => (
-            <div key={e.id} className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
-              <span className="text-xs text-muted-foreground tabular-nums shrink-0">
-                {e.createdAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-              </span>
-              <Badge variant="outline" className="text-xs">
-                {e.type.replace(/_/g, " ").toLowerCase()}
-              </Badge>
-              <span className="truncate">{e.message}</span>
-            </div>
-          ))}
-          {events.length === 0 && (
-            <p className="text-sm text-muted-foreground">No game events yet.</p>
-          )}
-        </TabsContent>
-      </Tabs>
+      <AuditLog
+        defaultTab={defaultTab}
+        scans={scans.map((s) => ({
+          id: s.id,
+          at: s.createdAt.toISOString(),
+          result: s.result,
+          team: s.team.name,
+          player: s.player.name,
+          checkpoint: s.checkpoint?.name ?? "unknown checkpoint",
+          points: s.pointsAwarded,
+          ip: s.ip,
+        }))}
+        logs={logs.map((l) => ({
+          id: l.id,
+          at: l.createdAt.toISOString(),
+          actorType: l.actorType,
+          action: l.action,
+          actor: l.actorName,
+          entity: l.entity ? `${l.entity} ${l.entityId?.slice(0, 8) ?? ""}`.trim() : null,
+        }))}
+        events={events.map((e) => ({
+          id: e.id,
+          at: e.createdAt.toISOString(),
+          type: e.type,
+          message: e.message,
+        }))}
+      />
     </div>
   );
 }

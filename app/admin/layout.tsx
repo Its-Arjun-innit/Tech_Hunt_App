@@ -1,19 +1,12 @@
-import { ShieldCheck } from "lucide-react";
+import Link from "next/link";
+import { Compass } from "lucide-react";
 import { getAdmin } from "@/lib/auth/admin";
 import { getCurrentGame } from "@/lib/game-engine/current-game";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { prisma } from "@/lib/db";
 import { AdminNav } from "@/components/admin/admin-nav";
-import { adminLogout } from "./login/actions";
+import { AdminTopBar } from "@/components/admin/top-bar";
 
 export const metadata = { title: "Admin — Campus Treasure Hunt" };
-
-const STATUS_CLASS: Record<string, string> = {
-  ACTIVE: "bg-success-subtle text-success-strong border-success/30",
-  PAUSED: "bg-warning-subtle text-warning-foreground border-warning/40 dark:text-warning",
-  ENDED: "bg-muted text-muted-foreground",
-  DRAFT: "bg-muted text-muted-foreground",
-};
 
 export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
   const admin = await getAdmin();
@@ -22,46 +15,59 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
   if (!admin) return <>{children}</>;
 
   const game = await getCurrentGame();
+  const pendingVerifications = game
+    ? await prisma.challengeAttempt.count({
+        where: { status: "PENDING", team: { gameId: game.id } },
+      })
+    : 0;
 
   return (
-    <div className="flex-1 flex flex-col lg:flex-row">
-      {/* flex-col so sign-out can sit at the bottom; sticky so the nav
-          survives long pages such as the audit log. */}
-      <aside className="lg:w-60 lg:shrink-0 flex flex-col border-b lg:border-b-0 lg:border-r lg:sticky lg:top-0 lg:h-screen">
-        <div className="px-4 py-4 border-b">
-          <div className="flex items-center gap-2 font-semibold">
-            <ShieldCheck className="size-5" /> Organizer
-          </div>
-          <p className="text-xs text-muted-foreground mt-1 truncate" title={admin.email}>
-            {admin.email}
-          </p>
-          {game && (
-            <div className="mt-2 space-y-1">
-              <p className="text-xs font-medium truncate" title={game.name}>
-                {game.name}
-              </p>
-              <Badge
-                variant="outline"
-                className={`text-xs font-normal ${STATUS_CLASS[game.status] ?? ""}`}
-              >
-                {game.status}
-              </Badge>
-            </div>
-          )}
-        </div>
+    <div className="flex flex-1 flex-col lg:flex-row">
+      <aside className="flex flex-col border-b bg-sidebar lg:sticky lg:top-0 lg:h-screen lg:w-56 lg:shrink-0 lg:border-b-0 lg:border-r">
+        <Link
+          href="/admin"
+          className="flex items-center gap-2 px-4 py-4 outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+        >
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+            <Compass className="size-4" />
+          </span>
+          <span className="min-w-0">
+            <span className="block text-sm font-semibold leading-tight">Campus Hunt</span>
+            <span className="block text-[11px] leading-tight text-muted-foreground">
+              Organizer console
+            </span>
+          </span>
+        </Link>
 
         <AdminNav />
 
-        <div className="p-2 mt-auto border-t lg:border-t-0">
-          <form action={adminLogout}>
-            <Button variant="ghost" size="sm" type="submit" className="w-full justify-start">
-              Sign out
-            </Button>
-          </form>
+        <div className="mt-auto hidden border-t px-4 py-3 lg:block">
+          <p className="truncate text-[11px] text-muted-foreground" title={admin.email}>
+            {admin.email}
+          </p>
+          <p className="text-[11px] text-faint-foreground">
+            {admin.role.replace("_", " ").toLowerCase()}
+          </p>
         </div>
       </aside>
 
-      <main className="flex-1 min-w-0 p-5 lg:p-8">{children}</main>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <AdminTopBar
+          game={
+            game
+              ? {
+                  name: game.name,
+                  status: game.status,
+                  startsAt: game.startsAt?.toISOString() ?? null,
+                  endsAt: game.endsAt?.toISOString() ?? null,
+                }
+              : null
+          }
+          adminEmail={admin.email}
+          pendingVerifications={pendingVerifications}
+        />
+        <main className="flex-1 p-5 lg:p-6">{children}</main>
+      </div>
     </div>
   );
 }

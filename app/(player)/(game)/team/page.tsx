@@ -1,7 +1,7 @@
 import { Flag, Puzzle, Trophy, Users } from "lucide-react";
 import { requirePlayer } from "@/lib/auth/player";
 import { prisma } from "@/lib/db";
-import { currentObjective } from "@/lib/game-engine/clues";
+import { currentTask } from "@/lib/game-engine/clues";
 import { getLeaderboard } from "@/lib/scoring/leaderboard";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,7 @@ const ONLINE_WINDOW_MS = 3 * 60_000;
 export default async function TeamPage() {
   const { player, team, game } = await requirePlayer();
 
-  const [members, completedScans, challengeCount, leaderboard, totalCheckpoints, objective] =
+  const [members, completedScans, challengeCount, leaderboard, totalCheckpoints, task] =
     await Promise.all([
       prisma.player.findMany({
         where: { teamId: team.id },
@@ -26,7 +26,7 @@ export default async function TeamPage() {
       prisma.challengeAttempt.count({ where: { teamId: team.id, status: "SUCCESS" } }),
       getLeaderboard(game.id),
       prisma.checkpoint.count({ where: { gameId: game.id, active: true } }),
-      currentObjective(team.id),
+      currentTask(team.id),
     ]);
 
   const rank = leaderboard.find((r) => r.teamId === team.id)?.rank ?? leaderboard.length;
@@ -111,11 +111,11 @@ export default async function TeamPage() {
             <Row
               label="Current objective"
               value={
-                objective?.checkpoint.challenge?.active
-                  ? "Finish the challenge here"
-                  : objective
+                task.kind === "challenge"
+                  ? `Finish ${task.title}`
+                  : task.kind === "travel"
                     ? "Travelling to your next clue"
-                    : completedScans > 0
+                    : task.kind === "finished"
                       ? "Finished"
                       : "Not started"
               }

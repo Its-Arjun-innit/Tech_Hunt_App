@@ -6,6 +6,8 @@ import { AnnouncementForm } from "@/components/admin/announcement-form";
 import { PageHeader } from "@/components/admin/page-header";
 import { EmptyState } from "@/components/admin/empty-state";
 import { Bell } from "lucide-react";
+import { AUDIENCE_LABEL } from "@/lib/announcements";
+import { AnnouncementList } from "@/components/admin/announcement-list";
 
 export const dynamic = "force-dynamic";
 
@@ -45,26 +47,27 @@ export default async function AnnouncementsPage() {
         </CardContent>
       </Card>
 
-      <div className="space-y-2">
-        {announcements.map((a) => (
-          <div key={a.id} className="rounded-lg border px-4 py-3">
-            <p className="text-sm">{a.message}</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              {a.createdAt.toLocaleString()} ·{" "}
-              {a.teamIds.length === 0
-                ? "all teams"
-                : a.teamIds.map((id) => teamNames.get(id) ?? "unknown").join(", ")}
-            </p>
-          </div>
-        ))}
-        {announcements.length === 0 && (
-          <EmptyState
-            icon={Bell}
-            title="Nothing sent yet"
-            description="Announcements appear on every player dashboard within a few seconds."
-          />
-        )}
-      </div>
+      {announcements.length === 0 ? (
+        <EmptyState
+          icon={Bell}
+          title="Nothing sent yet"
+          description="Announcements reach player dashboards within a few seconds, or the volunteer console when aimed at volunteers."
+        />
+      ) : (
+        <AnnouncementList
+          announcements={announcements.map((a) => ({
+            id: a.id,
+            message: a.message,
+            audience: AUDIENCE_LABEL[a.audience],
+            teams:
+              a.audience === "SELECTED_TEAMS"
+                ? a.teamIds.map((id) => teamNames.get(id) ?? "unknown")
+                : [],
+            createdAt: a.createdAt.toISOString(),
+            scheduledFor: a.scheduledFor?.toISOString() ?? null,
+          }))}
+        />
+      )}
     </div>
   );
 }
