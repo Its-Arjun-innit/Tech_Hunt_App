@@ -11,9 +11,9 @@ import { playerLogin, type LoginState } from "./actions";
 function SubmitButton() {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" className="w-full h-12 text-base" disabled={pending}>
+    <Button type="submit" className="h-12 w-full text-base font-semibold" disabled={pending}>
       <LogIn className="size-4" />
-      {pending ? "Signing in…" : "Start hunting"}
+      {pending ? "Signing in…" : "Enter game"}
     </Button>
   );
 }
@@ -67,7 +67,7 @@ export function LoginForm() {
       {state.error && (
         <p
           role="alert"
-          className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+          className="flex items-start gap-2 rounded-lg border border-danger/30 bg-danger-subtle px-3 py-2 text-sm text-danger"
         >
           <AlertCircle className="size-4 mt-0.5 shrink-0" />
           {state.error}

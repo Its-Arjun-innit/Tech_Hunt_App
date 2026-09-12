@@ -11,20 +11,25 @@ function format(ms: number) {
   return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
 }
 
-/** Counts down to the end time, or up from the start when no end is set. */
+/**
+ * Counts down to the end time, or up from the start when no end is set.
+ *
+ * The clock is client-only: elapsed time differs between the server render
+ * and the browser, so rendering it during SSR throws a hydration error.
+ */
 export function GameTimer({
   status,
   startsAt,
   endsAt,
+  compact = false,
 }: {
   status: string;
   startsAt: string | null;
   endsAt: string | null;
+  /** Inline treatment for the player header strip. */
+  compact?: boolean;
 }) {
   const [now, setNow] = useState(() => Date.now());
-  // Elapsed time differs between the server render and the client, so the
-  // clock only appears once mounted. Without this every page carrying a timer
-  // throws a hydration error.
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => setMounted(true), []);
@@ -35,45 +40,45 @@ export function GameTimer({
     return () => clearInterval(id);
   }, [status]);
 
-  if (status === "ENDED") {
-    return <p className="text-2xl font-semibold tabular-nums">Finished</p>;
-  }
+  const big = compact
+    ? "text-base font-semibold tabular-nums"
+    : "text-2xl font-semibold tabular-nums";
+  const caption = compact ? "text-xs text-muted-foreground" : "text-xs text-muted-foreground";
+
+  if (status === "ENDED") return <p className={big}>Finished</p>;
+
   if (!mounted) {
-    return <p className="text-2xl font-semibold tabular-nums text-muted-foreground">--:--</p>;
+    return <p className={`${big} text-muted-foreground`}>--:--</p>;
   }
   if (!startsAt) {
-    return <p className="text-sm text-muted-foreground">Waiting for the organizer to start.</p>;
+    return <p className={caption}>Waiting for the organizer to start.</p>;
   }
 
   const start = new Date(startsAt).getTime();
   if (now < start) {
     return (
-      <div>
-        <p className="text-2xl font-semibold tabular-nums">{format(start - now)}</p>
-        <p className="text-xs text-muted-foreground">until the hunt begins</p>
+      <div className={compact ? "flex items-baseline gap-1.5" : undefined}>
+        <p className={big}>{format(start - now)}</p>
+        <p className={caption}>until the hunt begins</p>
       </div>
     );
   }
 
   if (endsAt) {
-    const end = new Date(endsAt).getTime();
-    const remaining = end - now;
+    const remaining = new Date(endsAt).getTime() - now;
+    const urgent = remaining < 300_000;
     return (
-      <div>
-        <p
-          className={`text-2xl font-semibold tabular-nums ${remaining < 300_000 ? "text-destructive" : ""}`}
-        >
-          {format(remaining)}
-        </p>
-        <p className="text-xs text-muted-foreground">remaining</p>
+      <div className={compact ? "flex items-baseline gap-1.5" : undefined}>
+        <p className={`${big} ${urgent ? "text-danger" : ""}`}>{format(remaining)}</p>
+        <p className={caption}>remaining</p>
       </div>
     );
   }
 
   return (
-    <div>
-      <p className="text-2xl font-semibold tabular-nums">{format(now - start)}</p>
-      <p className="text-xs text-muted-foreground">elapsed</p>
+    <div className={compact ? "flex items-baseline gap-1.5" : undefined}>
+      <p className={big}>{format(now - start)}</p>
+      <p className={caption}>elapsed</p>
     </div>
   );
 }

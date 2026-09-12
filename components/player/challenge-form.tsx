@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
-import { submitChallengeAnswer } from "@/app/(player)/challenge/actions";
+import { submitChallengeAnswer } from "@/app/(player)/(game)/challenge/actions";
 
 type QuizConfig = { questions: { question: string; options: string[] }[] };
 type StageConfig = { stages: { prompt: string }[]; stageCount: number };

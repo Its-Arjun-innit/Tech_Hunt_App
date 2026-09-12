@@ -1,33 +1,53 @@
 import { redirect } from "next/navigation";
-import { MapPin } from "lucide-react";
+import { Compass } from "lucide-react";
 import { getPlayer } from "@/lib/auth/player";
 import { LoginForm } from "./login-form";
 
-export const metadata = { title: "Sign in — Campus Treasure Hunt" };
+export const metadata = { title: "Sign in — Campus Hunt" };
 
 export default async function PlayerLoginPage() {
   if (await getPlayer()) redirect("/dashboard");
 
   return (
-    <main className="flex-1 flex flex-col justify-center px-5 py-10 max-w-md w-full mx-auto">
-      <div className="mb-8 text-center">
-        <div className="inline-flex size-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground mb-4">
-          <MapPin className="size-7" />
+    <main className="relative flex flex-1 flex-col justify-center overflow-hidden px-5 py-10">
+      {/* Two quiet lime washes so the entry screen feels like a game opening
+          rather than a corporate form, without resorting to a gradient. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -left-24 -top-24 size-72 rounded-full bg-primary/15 blur-3xl"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -bottom-32 -right-20 size-72 rounded-full bg-accent blur-3xl"
+      />
+
+      <div className="relative mx-auto w-full max-w-sm">
+        <div className="text-center">
+          <span className="inline-flex size-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg">
+            <Compass className="size-7" />
+          </span>
+          <h1 className="mt-5 text-3xl font-bold tracking-tight">Campus Hunt</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Enter your team credentials to continue.
+          </p>
         </div>
-        <h1 className="text-2xl font-semibold tracking-tight">Campus Treasure Hunt</h1>
-        <p className="text-muted-foreground mt-1 text-sm">
-          Sign in with the details your organizer gave you.
+
+        <div className="mt-8 rounded-2xl border bg-surface p-5 shadow-sm">
+          <LoginForm />
+        </div>
+
+        <p className="mt-6 text-center text-xs text-muted-foreground">
+          Need help? Find an organizer.
+        </p>
+        <p className="mt-2 text-center text-xs">
+          <a
+            href="/admin/login"
+            className="rounded text-faint-foreground underline underline-offset-4 outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+          >
+            Organizer sign in
+          </a>
         </p>
       </div>
-
-      <LoginForm />
-
-      <p className="mt-8 text-center text-xs text-muted-foreground">
-        Organizer?{" "}
-        <a href="/admin/login" className="underline underline-offset-4">
-          Admin sign in
-        </a>
-      </p>
     </main>
   );
 }

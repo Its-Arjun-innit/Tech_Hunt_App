@@ -2,11 +2,11 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CameraOff, Keyboard, Loader2 } from "lucide-react";
+import { CameraOff, Keyboard, Loader2, QrCode } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { submitScan } from "@/app/(player)/scan/actions";
+import { submitScan } from "@/app/(player)/(game)/scan/actions";
 import type { ScanOutcome } from "@/lib/game-engine/process-scan";
 import { ScanResultView } from "@/components/player/scan-result";
 
@@ -83,28 +83,9 @@ export function Scanner() {
     );
   }
 
-  return (
-    <div className="flex-1 p-5 max-w-lg mx-auto w-full space-y-4">
-      {!manual && (
-        <>
-          <div
-            id={ELEMENT_ID}
-            className="overflow-hidden rounded-xl border bg-muted aspect-square [&_video]:size-full [&_video]:object-cover"
-          />
-          <p className="text-center text-sm text-muted-foreground">
-            {pending ? "Checking your scan…" : "Point your camera at the checkpoint QR code."}
-          </p>
-        </>
-      )}
-
-      {cameraError && !manual && (
-        <p className="flex items-start gap-2 rounded-md border border-warning/40 bg-warning-subtle px-3 py-2 text-sm">
-          <CameraOff className="size-4 mt-0.5 shrink-0" />
-          {cameraError}
-        </p>
-      )}
-
-      {manual ? (
+  if (manual) {
+    return (
+      <div className="mx-auto w-full max-w-lg flex-1 space-y-4 px-5 pb-6">
         <form
           className="space-y-3"
           onSubmit={(e) => {
@@ -121,18 +102,21 @@ export function Scanner() {
               placeholder="cp_x8k29fq2mz"
               autoComplete="off"
               autoCapitalize="none"
-              className="h-12 text-base"
+              className="h-12 text-base font-mono"
               required
             />
+            <p className="text-xs text-muted-foreground">
+              The code is printed underneath the QR square on the poster.
+            </p>
           </div>
-          <Button type="submit" className="w-full h-12" disabled={pending}>
-            {pending && <Loader2 className="size-4 animate-spin" />}
+          <Button type="submit" className="h-12 w-full text-base" disabled={pending}>
+            {pending && <Loader2 className="size-4 motion-safe:animate-spin" />}
             Submit code
           </Button>
           <Button
             type="button"
             variant="ghost"
-            className="w-full"
+            className="h-11 w-full"
             onClick={() => {
               handledRef.current = false;
               setManual(false);
@@ -141,11 +125,77 @@ export function Scanner() {
             Use the camera instead
           </Button>
         </form>
-      ) : (
-        <Button variant="outline" className="w-full h-11" onClick={() => setManual(true)}>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-1 flex-col">
+      <div className="px-5 text-center">
+        <h1 className="text-xl font-semibold">Scan checkpoint</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {pending ? "Verifying checkpoint…" : "Point your camera at the QR code."}
+        </p>
+      </div>
+
+      {/* Near-full-screen viewfinder: the scanner is the whole point of this
+          screen, so it gets the room. The frame corners are drawn over the
+          video rather than by the library, so they follow the theme. */}
+      <div className="relative mx-auto mt-4 w-full max-w-lg flex-1 px-5">
+        <div className="relative aspect-square w-full overflow-hidden rounded-2xl border bg-black/90">
+          <div
+            id={ELEMENT_ID}
+            className="size-full [&_video]:size-full [&_video]:object-cover [&_img]:hidden"
+          />
+
+          <div aria-hidden className="pointer-events-none absolute inset-0">
+            <div className="absolute inset-[14%]">
+              {[
+                "left-0 top-0 border-l-4 border-t-4 rounded-tl-xl",
+                "right-0 top-0 border-r-4 border-t-4 rounded-tr-xl",
+                "left-0 bottom-0 border-l-4 border-b-4 rounded-bl-xl",
+                "right-0 bottom-0 border-r-4 border-b-4 rounded-br-xl",
+              ].map((c) => (
+                <span key={c} className={`absolute size-10 border-primary ${c}`} />
+              ))}
+            </div>
+
+            {pending && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+                <div className="flex flex-col items-center gap-2 text-white">
+                  <Loader2 className="size-7 motion-safe:animate-spin" />
+                  <p className="text-sm font-medium">Verifying checkpoint…</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="mx-auto w-full max-w-lg space-y-3 px-5 pb-4 pt-4">
+        {cameraError && (
+          <p className="flex items-start gap-2 rounded-xl border border-warning/40 bg-warning-subtle px-3 py-2 text-sm">
+            <CameraOff className="mt-0.5 size-4 shrink-0" />
+            {cameraError}
+          </p>
+        )}
+
+        <Button
+          variant="outline"
+          className="h-11 w-full"
+          onClick={() => setManual(true)}
+          disabled={pending}
+        >
           <Keyboard className="size-4" /> Enter code manually
         </Button>
-      )}
+
+        {!cameraError && (
+          <p className="flex items-center justify-center gap-1.5 text-xs text-faint-foreground">
+            <QrCode className="size-3.5" />
+            Hold steady, the code scans itself
+          </p>
+        )}
+      </div>
     </div>
   );
 }

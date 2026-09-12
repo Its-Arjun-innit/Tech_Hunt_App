@@ -20,7 +20,9 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL(target, request.url));
   }
 
-  const needsPlayer = ["/dashboard", "/scan", "/challenge", "/leaderboard"].some(
+  const needsPlayer = [
+    "/dashboard", "/scan", "/challenge", "/leaderboard", "/clue", "/team", "/activity",
+  ].some(
     (p) => pathname === p || pathname.startsWith(`${p}/`),
   );
 
@@ -34,5 +36,15 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/scan/:path*", "/challenge/:path*", "/leaderboard", "/admin/:path*", "/volunteer/:path*"],
+  matcher: [
+    "/dashboard/:path*",
+    "/scan/:path*",
+    "/challenge/:path*",
+    "/leaderboard",
+    "/clue",
+    "/team",
+    "/activity",
+    "/admin/:path*",
+    "/volunteer/:path*",
+  ],
 };
