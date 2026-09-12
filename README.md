@@ -148,15 +148,54 @@ Checkpoint traffic is derived, never stored:
 
 ---
 
+## Design system
+
+Three interfaces share one set of tokens and have deliberately different
+information density: the player app is mobile-first and objective-led, the
+organizer console is desktop-first and dense, the volunteer console does one job.
+
+Colour lives entirely in tokens defined at the top of `app/globals.css`. Three
+rules are documented there and worth knowing before changing any of them:
+
+1. **Hue separation.** The brand is lime and the "available" traffic state is
+   emerald, which are close. They are kept about 40 degrees apart in hue.
+2. **Lime is never a status.** `--primary` is for interactive and brand surfaces
+   only. Status uses the four status tokens.
+3. **Status never relies on colour alone.** Every traffic indicator ships a word
+   and a distinct glyph as well as a fill, via `TrafficBadge`. This is also what
+   makes the game readable for colour-blind organizers.
+
+Contrast was measured rather than eyeballed. Lime at its brand lightness reaches
+only 2.36:1 on white, so it is a fill, never text; `--primary-strong` and
+`--success-strong` are the text-safe variants at 6.2:1 and 5.7:1.
+
+**Motion rule.** Nothing that carries information animates its opacity from 0.
+An entrance fade that fails to run leaves a clue or a button invisible, which
+mid-game means a stranded team. Content animates transform only and reads
+correctly even if no animation fires. Framer Motion is configured once with
+`reducedMotion="user"`, so no component guards it individually.
+
+---
+
 ## Project layout
 
 ```
 app/
-  (player)/     login, dashboard, scan, challenge, leaderboard
-  admin/        overview, game, teams, checkpoints, map, routing,
-                challenges, qr, announcements, audit
-  volunteer/    verification console
-  api/qr/[id]   QR image endpoint, admin only
+  (player)/
+    login/            entry screen
+    (game)/           signed-in tabs behind the bottom nav
+      dashboard/      objective-first home
+      clue/           focused clue with progressive levels
+      scan/           near-full-screen scanner
+      team/           members, presence, progress
+      activity/       chronological feed
+      leaderboard/
+    scan/[token]/     direct link from a phone camera, outside the tabs
+  admin/              dashboard, map, routing, leaderboard, teams, players,
+                      volunteers, announcements, checkpoints, challenges,
+                      qr, game, settings, audit
+  volunteer/          verification console
+  api/qr/[id]         QR image endpoint, admin only
 lib/
   auth/         player and admin sessions, role checks, audit logging
   game-engine/  processScan, advanceTeam, challenge completion, clues
@@ -177,7 +216,9 @@ npm test
 ```
 
 Covers the routing engine (spreading, capacity, visited exclusion, weight tuning),
-challenge grading (including that answers never leak to the client) and the CSV parser.
+challenge grading (including that answers never leak to the client), the CSV
+parser, announcement audience and scheduling rules, sidebar route matching, and
+the QR poster origin.
 
 Two scripts check behaviour that needs a live database:
 
