@@ -4,12 +4,53 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* ─────────────────────────────────────────────────────────────────────
+   COLOUR RULES — read before changing any token below.
+
+   The brand is lime. The "available" traffic state is emerald. Those are
+   neighbours on the colour wheel, so three rules keep them legible:
+
+   1. HUE SEPARATION. Brand lime sits near hue 125 at high chroma; status
+      success sits near hue 165 at lower chroma. Keep them ~40 apart.
+   2. LIME IS NEVER A STATUS. Use --primary only for interactive and brand
+      surfaces: primary buttons, active nav, focus rings, score emphasis,
+      the live pulse. Status uses only the four status tokens.
+   3. STATUS NEVER RELIES ON COLOUR ALONE. Every traffic indicator carries
+      a word and a glyph as well as a fill; see lib/routing/traffic.ts.
+      This is also what makes the game usable for colour-blind organizers.
+   ───────────────────────────────────────────────────────────────────── */
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-sans);
   --font-mono: var(--font-geist-mono);
   --font-heading: var(--font-sans);
+
+  /* Surfaces */
+  --color-surface: var(--surface);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-border-strong: var(--border-strong);
+
+  /* Status */
+  --color-primary-strong: var(--primary-strong);
+  --color-success-strong: var(--success-strong);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-success-subtle: var(--success-subtle);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning-subtle: var(--warning-subtle);
+  --color-danger: var(--danger);
+  --color-danger-foreground: var(--danger-foreground);
+  --color-danger-subtle: var(--danger-subtle);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-info-subtle: var(--info-subtle);
+
+  /* Text */
+  --color-faint-foreground: var(--faint-foreground);
+
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -46,75 +87,144 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+
+  /* Display scale for player numbers: score, countdown, rank. */
+  --text-display: 3rem;
+  --text-display--line-height: 1;
+  --text-display--letter-spacing: -0.03em;
+  --text-display--font-weight: 700;
+  --text-hero: 4.25rem;
+  --text-hero--line-height: 0.95;
+  --text-hero--letter-spacing: -0.04em;
+  --text-hero--font-weight: 800;
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
+  --background: oklch(0.985 0.004 120);
+  --foreground: oklch(0.17 0.012 140);
+
+  --surface: oklch(1 0 0);
+  --surface-elevated: oklch(1 0 0);
+
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
+  --card-foreground: var(--foreground);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
+  --popover-foreground: var(--foreground);
+
+  /* Brand lime. Interactive only, never a status. */
+  --primary: oklch(0.72 0.19 128);
+  --primary-foreground: oklch(0.19 0.03 140);
+  /* Lime at 0.72 only reaches 2.36:1 on white, so it can be a fill but never
+     text. --primary-strong is the readable one: 6.2:1 on white. Measured, not
+     guessed; see the contrast check in the build notes. */
+  --primary-strong: oklch(0.48 0.15 128);
+  --accent: oklch(0.96 0.03 130);
+  --accent-foreground: oklch(0.26 0.04 140);
+
+  --secondary: oklch(0.965 0.005 130);
+  --secondary-foreground: oklch(0.24 0.015 140);
+  --muted: oklch(0.965 0.005 130);
+  --muted-foreground: oklch(0.52 0.014 140);
+  --faint-foreground: oklch(0.66 0.01 140);
+
+  /* Status. Success is pushed to hue 165 to stay clear of brand lime. */
+  --success: oklch(0.6 0.14 165);
+  --success-foreground: oklch(0.99 0 0);
+  --success-subtle: oklch(0.955 0.045 165);
+  /* 5.7:1 on success-subtle, so small badge text is readable. */
+  --success-strong: oklch(0.46 0.13 165);
+  --warning: oklch(0.7 0.16 70);
+  --warning-foreground: oklch(0.22 0.04 70);
+  --warning-subtle: oklch(0.96 0.05 80);
+  --danger: oklch(0.58 0.22 18);
+  --danger-foreground: oklch(0.99 0 0);
+  --danger-subtle: oklch(0.955 0.035 20);
+  --info: oklch(0.54 0.15 250);
+  --info-foreground: oklch(0.99 0 0);
+  --info-subtle: oklch(0.955 0.03 250);
+
+  --destructive: var(--danger);
+  --border: oklch(0.915 0.006 130);
+  --border-strong: oklch(0.85 0.01 130);
+  --input: oklch(0.915 0.006 130);
+  --ring: oklch(0.72 0.19 128);
+
+  --chart-1: oklch(0.72 0.19 128);
+  --chart-2: oklch(0.6 0.14 165);
+  --chart-3: oklch(0.7 0.16 70);
+  --chart-4: oklch(0.58 0.15 250);
+  --chart-5: oklch(0.58 0.22 18);
+
   --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --sidebar: oklch(0.975 0.006 130);
+  --sidebar-foreground: var(--foreground);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: oklch(0.95 0.012 130);
+  --sidebar-accent-foreground: var(--foreground);
+  --sidebar-border: oklch(0.915 0.006 130);
+  --sidebar-ring: var(--ring);
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
+  --background: oklch(0.155 0.012 150);
+  --foreground: oklch(0.97 0.006 130);
+
+  --surface: oklch(0.196 0.013 150);
+  --surface-elevated: oklch(0.235 0.015 150);
+
+  --card: oklch(0.196 0.013 150);
+  --card-foreground: var(--foreground);
+  --popover: oklch(0.235 0.015 150);
+  --popover-foreground: var(--foreground);
+
+  /* Slightly brighter lime so it carries on a dark ground. */
+  --primary: oklch(0.8 0.21 128);
+  --primary-foreground: oklch(0.17 0.035 140);
+  --primary-strong: oklch(0.8 0.21 128);
+  --accent: oklch(0.3 0.05 135);
+  --accent-foreground: oklch(0.93 0.05 130);
+
+  --secondary: oklch(0.27 0.015 150);
+  --secondary-foreground: oklch(0.96 0.006 130);
+  --muted: oklch(0.27 0.015 150);
+  --muted-foreground: oklch(0.72 0.014 140);
+  --faint-foreground: oklch(0.58 0.012 140);
+
+  --success: oklch(0.72 0.15 165);
+  --success-foreground: oklch(0.16 0.03 165);
+  --success-subtle: oklch(0.29 0.07 165);
+  --success-strong: oklch(0.72 0.15 165);
+  --warning: oklch(0.79 0.16 75);
+  --warning-foreground: oklch(0.18 0.04 70);
+  --warning-subtle: oklch(0.3 0.07 75);
+  --danger: oklch(0.68 0.21 20);
+  --danger-foreground: oklch(0.16 0.03 20);
+  --danger-subtle: oklch(0.3 0.09 20);
+  --info: oklch(0.7 0.15 250);
+  --info-foreground: oklch(0.16 0.03 250);
+  --info-subtle: oklch(0.3 0.07 250);
+
+  --destructive: var(--danger);
+  --border: oklch(1 0 0 / 11%);
+  --border-strong: oklch(1 0 0 / 20%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --ring: oklch(0.8 0.21 128);
+
+  --chart-1: oklch(0.8 0.21 128);
+  --chart-2: oklch(0.72 0.15 165);
+  --chart-3: oklch(0.79 0.16 75);
+  --chart-4: oklch(0.7 0.15 250);
+  --chart-5: oklch(0.68 0.21 20);
+
+  --sidebar: oklch(0.178 0.013 150);
+  --sidebar-foreground: var(--foreground);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: oklch(0.26 0.02 145);
+  --sidebar-accent-foreground: var(--foreground);
+  --sidebar-border: oklch(1 0 0 / 11%);
+  --sidebar-ring: var(--ring);
 }
 
 @layer base {
@@ -126,5 +236,25 @@
   }
   html {
     @apply font-sans;
+  }
+  /* Numbers that change should not make the layout jitter. */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@layer utilities {
+  /* Respects the OS setting; Framer Motion is configured to do the same. */
+  @media (prefers-reduced-motion: reduce) {
+    .motion-safe\:animate-pulse,
+    .motion-safe\:animate-ping,
+    .motion-safe\:animate-spin {
+      animation: none;
+    }
+  }
+
+  /* Bottom nav clears the iPhone home indicator. */
+  .pb-safe {
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
   }
 }

@@ -8,9 +8,9 @@ import { PageHeader } from "@/components/admin/page-header";
 export const dynamic = "force-dynamic";
 
 const RESULT_CLASS: Record<string, string> = {
-  SUCCESS: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
-  DUPLICATE: "bg-amber-500/15 text-amber-700 dark:text-amber-400",
-  RATE_LIMITED: "bg-amber-500/15 text-amber-700 dark:text-amber-400",
+  SUCCESS: "bg-success-subtle text-success-strong",
+  DUPLICATE: "bg-warning-subtle text-warning-foreground dark:text-warning",
+  RATE_LIMITED: "bg-warning-subtle text-warning-foreground dark:text-warning",
 };
 
 export default async function AuditPage({
@@ -83,7 +83,7 @@ export default async function AuditPage({
               <span className="text-muted-foreground">/ {s.player.name}</span>
               <span className="truncate">{s.checkpoint?.name ?? "unknown checkpoint"}</span>
               {s.pointsAwarded > 0 && (
-                <span className="text-emerald-600 font-medium">+{s.pointsAwarded}</span>
+                <span className="text-success-strong font-medium">+{s.pointsAwarded}</span>
               )}
               {s.ip && <span className="ml-auto text-xs text-muted-foreground">{s.ip}</span>}
             </div>

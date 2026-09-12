@@ -19,7 +19,7 @@ export default async function ScanPage() {
 
       {game.status !== "ACTIVE" ? (
         <div className="p-5 max-w-lg mx-auto w-full">
-          <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm">
+          <div className="rounded-lg border border-warning/40 bg-warning-subtle px-4 py-3 text-sm">
             Scanning is disabled while the game is {game.status.toLowerCase()}.
           </div>
         </div>

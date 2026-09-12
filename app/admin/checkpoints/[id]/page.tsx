@@ -92,7 +92,7 @@ export default async function CheckpointEditorPage({
           <TabsTrigger value="challenge">
             Challenge
             {checkpoint.challenge && (
-              <span className="ml-1.5 size-1.5 rounded-full bg-emerald-500" aria-hidden />
+              <span className="ml-1.5 size-1.5 rounded-full bg-success" aria-hidden />
             )}
           </TabsTrigger>
           <TabsTrigger value="qr">QR code</TabsTrigger>

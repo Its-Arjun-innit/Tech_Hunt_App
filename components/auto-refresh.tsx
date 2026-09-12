@@ -76,11 +76,11 @@ export function AutoRefresh({
     >
       <span className="relative flex size-1.5">
         {!paused && (
-          <span className="absolute inline-flex size-full rounded-full bg-emerald-500 opacity-70 motion-safe:animate-ping" />
+          <span className="absolute inline-flex size-full rounded-full bg-success opacity-70 motion-safe:animate-ping" />
         )}
         <span
           className={`relative inline-flex size-1.5 rounded-full ${
-            paused ? "bg-muted-foreground/40" : "bg-emerald-500"
+            paused ? "bg-muted-foreground/40" : "bg-success"
           }`}
         />
       </span>

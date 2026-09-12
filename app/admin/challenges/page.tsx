@@ -61,7 +61,7 @@ export default async function ChallengesPage() {
             </div>
             {!c.active && <Badge variant="outline">inactive</Badge>}
             {(pendingBy.get(c.id) ?? 0) > 0 && (
-              <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-400">
+              <Badge className="bg-warning-subtle text-warning-foreground dark:text-warning">
                 {pendingBy.get(c.id)} awaiting verification
               </Badge>
             )}

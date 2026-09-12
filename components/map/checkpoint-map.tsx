@@ -5,6 +5,7 @@ import { APIProvider, Map, AdvancedMarker, useMap, useMapsLibrary } from "@vis.g
 import { MapPin, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { haversine } from "@/lib/routing/engine";
+import { TRAFFIC_FILL } from "@/lib/routing/traffic";
 
 export type MapPoint = {
   id: string;
@@ -15,11 +16,17 @@ export type MapPoint = {
   state?: "GREEN" | "YELLOW" | "RED" | "GRAY";
 };
 
-const STATE_COLOR: Record<string, string> = {
-  GREEN: "#10b981",
-  YELLOW: "#f59e0b",
-  RED: "#ef4444",
-  GRAY: "#94a3b8",
+// Colour comes from the status tokens, never a literal, so light and dark
+// stay in step. Shape varies too: colour alone is a weak signal here because
+// the brand is lime. See the colour rules in app/globals.css.
+const STATE_COLOR = TRAFFIC_FILL;
+
+/** Square for congested, ring for approaching, dot otherwise. */
+const STATE_SHAPE: Record<string, string> = {
+  GREEN: "rounded-full",
+  YELLOW: "rounded-full ring-2 ring-offset-1",
+  RED: "rounded-[2px]",
+  GRAY: "rounded-full opacity-70",
 };
 
 export function CheckpointMap({
@@ -72,7 +79,7 @@ export function CheckpointMap({
                 title={p.name}
               >
                 <div
-                  className="size-4 rounded-full border-2 border-white shadow"
+                  className={`size-4 border-2 border-white shadow ${STATE_SHAPE[p.state ?? "GRAY"]}`}
                   style={{ background: STATE_COLOR[p.state ?? "GRAY"] }}
                 />
               </AdvancedMarker>
@@ -88,7 +95,7 @@ export function CheckpointMap({
                 }}
                 title="This checkpoint"
               >
-                <MapPin className="size-8 text-primary drop-shadow" fill="currentColor" />
+                <MapPin className="size-8 text-primary-strong drop-shadow" fill="currentColor" />
               </AdvancedMarker>
             )}
 
@@ -233,7 +240,7 @@ function FallbackMap({
               onMouseLeave={() => setHint(null)}
             >
               <div
-                className="size-3 rounded-full border-2 border-background shadow"
+                className={`size-3 border-2 border-background shadow ${STATE_SHAPE[p.state ?? "GRAY"]}`}
                 style={{ background: STATE_COLOR[p.state ?? "GRAY"] }}
               />
               <span className="absolute left-4 top-1/2 -translate-y-1/2 whitespace-nowrap text-[10px] text-muted-foreground">
@@ -249,7 +256,7 @@ function FallbackMap({
             className="absolute -translate-x-1/2 -translate-y-full"
             style={{ left: `${toPercent(value).left}%`, top: `${toPercent(value).top}%` }}
           >
-            <MapPin className="size-6 text-primary" fill="currentColor" />
+            <MapPin className="size-6 text-primary-strong" fill="currentColor" />
           </div>
         )}
 

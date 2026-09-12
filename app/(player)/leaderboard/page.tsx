@@ -8,7 +8,13 @@ import { Button } from "@/components/ui/button";
 export const metadata = { title: "Leaderboard — Campus Treasure Hunt" };
 export const dynamic = "force-dynamic";
 
-const MEDAL = ["bg-amber-400/20 text-amber-700 dark:text-amber-400", "bg-slate-400/20", "bg-orange-500/20"];
+// Podium tints. Deliberately warm/neutral metals, never the brand lime or a
+// status colour, so a rank badge is never mistaken for a checkpoint state.
+const MEDAL = [
+  "bg-warning-subtle text-warning-foreground dark:text-warning ring-1 ring-warning/30",
+  "bg-muted text-foreground ring-1 ring-border-strong",
+  "bg-warning-subtle/60 text-warning-foreground dark:text-warning ring-1 ring-warning/20",
+];
 
 export default async function LeaderboardPage() {
   const { team, game } = await requirePlayer();

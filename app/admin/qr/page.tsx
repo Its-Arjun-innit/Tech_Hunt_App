@@ -59,7 +59,7 @@ export default async function QrPostersPage() {
               {scanUrl(cp.qrToken)}
             </p>
             {!cp.active && (
-              <p className="mt-3 text-sm text-red-600 print:hidden">
+              <p className="mt-3 text-sm text-danger print:hidden">
                 This checkpoint is currently disabled.
               </p>
             )}

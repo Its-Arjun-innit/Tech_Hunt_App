@@ -98,7 +98,7 @@ export function Scanner() {
       )}
 
       {cameraError && !manual && (
-        <p className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm">
+        <p className="flex items-start gap-2 rounded-md border border-warning/40 bg-warning-subtle px-3 py-2 text-sm">
           <CameraOff className="size-4 mt-0.5 shrink-0" />
           {cameraError}
         </p>

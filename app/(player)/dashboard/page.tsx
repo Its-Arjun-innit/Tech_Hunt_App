@@ -104,7 +104,7 @@ export default async function DashboardPage() {
 
         {/* Current objective: either finish the challenge here, or travel. */}
         {pendingChallenge ? (
-          <Card className="border-amber-500/40 bg-amber-500/5">
+          <Card className="border-warning/40 bg-warning-subtle/60">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
                 <Lightbulb className="size-4" /> Challenge waiting
@@ -176,7 +176,7 @@ export default async function DashboardPage() {
                   <span className={m.id === player.id ? "font-medium" : ""}>{m.name}</span>
                   <Badge variant="outline" className="gap-1.5 text-xs font-normal">
                     <span
-                      className={`size-1.5 rounded-full ${online ? "bg-emerald-500" : "bg-muted-foreground/40"}`}
+                      className={`size-1.5 rounded-full ${online ? "bg-success" : "bg-muted-foreground/40"}`}
                     />
                     {online ? "Online" : "Offline"}
                   </Badge>
@@ -198,7 +198,7 @@ export default async function DashboardPage() {
             ) : (
               activity.map((e) => (
                 <div key={e.id} className="flex items-start gap-2 text-sm">
-                  <CheckCircle2 className="size-4 mt-0.5 shrink-0 text-emerald-600" />
+                  <CheckCircle2 className="size-4 mt-0.5 shrink-0 text-success-strong" />
                   <div className="min-w-0">
                     <p className="truncate">{e.message}</p>
                     <p className="text-xs text-muted-foreground">
@@ -247,7 +247,7 @@ function GameStatusBanner({ status }: { status: string }) {
     ENDED: "The game has ended. Final scores are locked.",
   };
   return (
-    <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm">
+    <div className="rounded-lg border border-warning/40 bg-warning-subtle px-4 py-3 text-sm">
       {copy[status] ?? status}
     </div>
   );

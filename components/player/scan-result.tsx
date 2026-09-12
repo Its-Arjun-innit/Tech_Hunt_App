@@ -33,12 +33,12 @@ export function ScanResultView({
 
   return (
     <div className="flex-1 p-5 max-w-lg mx-auto w-full space-y-5">
-      <Card className="border-emerald-500/40 bg-emerald-500/5">
+      <Card className="border-success/40 bg-success-subtle/50">
         <CardContent className="pt-6 text-center space-y-2">
-          <CheckCircle2 className="size-12 mx-auto text-emerald-600" />
+          <CheckCircle2 className="size-12 mx-auto text-success-strong" />
           <h2 className="text-lg font-semibold">Checkpoint completed!</h2>
           <p className="text-sm text-muted-foreground">{outcome.checkpointName}</p>
-          <p className="text-3xl font-bold text-emerald-600 tabular-nums">
+          <p className="text-3xl font-bold text-success-strong tabular-nums">
             +{outcome.pointsAwarded}
           </p>
           <p className="text-sm text-muted-foreground">
@@ -49,7 +49,7 @@ export function ScanResultView({
 
       {outcome.challengeId ? (
         <>
-          <Card className="border-amber-500/40 bg-amber-500/5">
+          <Card className="border-warning/40 bg-warning-subtle/60">
             <CardContent className="pt-6 space-y-1">
               <p className="flex items-center gap-2 text-sm font-medium">
                 <Flag className="size-4" /> A challenge waits here

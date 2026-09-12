@@ -70,7 +70,7 @@ export function TeamRoutingRow({
           {team.expired && (
             <Badge
               variant="outline"
-              className="text-xs shrink-0 border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400"
+              className="text-xs shrink-0 border-warning/40 bg-warning-subtle text-warning-foreground dark:text-warning"
             >
               reservation expired
             </Badge>

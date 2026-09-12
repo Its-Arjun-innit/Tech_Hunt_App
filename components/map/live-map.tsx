@@ -3,7 +3,8 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { TRAFFIC_CLASS, TRAFFIC_LABEL, type TrafficState } from "@/lib/routing/traffic";
+import type { TrafficState } from "@/lib/routing/traffic";
+import { TrafficBadge } from "@/components/status-badge";
 import { CheckpointMap } from "./checkpoint-map";
 import { moveCheckpoint } from "@/app/admin/checkpoints/actions";
 import { Button } from "@/components/ui/button";
@@ -59,11 +60,7 @@ export function LiveMap({ apiKey, points }: { apiKey: string; points: LivePoint[
         {points.map((p) => (
           <div key={p.id} className="rounded-lg border px-3 py-2.5 space-y-1.5">
             <div className="flex items-center gap-2">
-              <span
-                className={`rounded-full border px-2 py-0.5 text-xs font-medium ${TRAFFIC_CLASS[p.state]}`}
-              >
-                {TRAFFIC_LABEL[p.state]}
-              </span>
+              <TrafficBadge state={p.state} />
               <span className="font-medium text-sm truncate flex-1">{p.name}</span>
               <Button
                 size="sm"
@@ -79,7 +76,7 @@ export function LiveMap({ apiKey, points }: { apiKey: string; points: LivePoint[
               capacity {p.capacity}
             </p>
             {p.approachingTeams.length > 0 && (
-              <p className="text-xs text-amber-600">
+              <p className="text-xs text-warning-foreground dark:text-warning">
                 Approaching: {p.approachingTeams.join(", ")}
               </p>
             )}

@@ -3,7 +3,8 @@ import { Flag, Plus, QrCode } from "lucide-react";
 import { requireAdmin } from "@/lib/auth/admin";
 import { prisma } from "@/lib/db";
 import { getCurrentGame } from "@/lib/game-engine/current-game";
-import { getCheckpointTraffic, TRAFFIC_CLASS, TRAFFIC_LABEL } from "@/lib/routing/traffic";
+import { getCheckpointTraffic } from "@/lib/routing/traffic";
+import { TrafficBadge } from "@/components/status-badge";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -55,11 +56,7 @@ export default async function CheckpointsPage() {
               href={`/admin/checkpoints/${cp.id}`}
               className="flex flex-wrap items-center gap-3 rounded-lg border px-4 py-3 outline-none transition-colors hover:bg-muted/50 hover:border-foreground/20 focus-visible:ring-3 focus-visible:ring-ring/50"
             >
-              <span
-                className={`rounded-full border px-2 py-0.5 text-xs font-medium ${TRAFFIC_CLASS[state]}`}
-              >
-                {TRAFFIC_LABEL[state]}
-              </span>
+              <TrafficBadge state={state} />
               <div className="min-w-0 flex-1">
                 <p className="font-medium truncate">{cp.name}</p>
                 <p className="text-xs text-muted-foreground truncate">

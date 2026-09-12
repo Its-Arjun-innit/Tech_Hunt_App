@@ -77,7 +77,7 @@ export function ImportRoster() {
       </Card>
 
       {errors.length > 0 && (
-        <Card className="border-amber-500/40 bg-amber-500/5">
+        <Card className="border-warning/40 bg-warning-subtle/60">
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
               <AlertTriangle className="size-4" /> Skipped rows
@@ -94,7 +94,7 @@ export function ImportRoster() {
       )}
 
       {credentials && credentials.length > 0 && (
-        <Card className="border-emerald-500/40">
+        <Card className="border-success/40">
           <CardHeader className="pb-3">
             <CardTitle className="text-base">
               Login details — shown once, print them now

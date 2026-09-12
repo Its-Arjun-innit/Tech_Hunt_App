@@ -1,7 +1,8 @@
 import { requireAdmin } from "@/lib/auth/admin";
 import { prisma } from "@/lib/db";
 import { getCurrentGame } from "@/lib/game-engine/current-game";
-import { getCheckpointTraffic, TRAFFIC_CLASS, TRAFFIC_LABEL } from "@/lib/routing/traffic";
+import { getCheckpointTraffic } from "@/lib/routing/traffic";
+import { TrafficBadge } from "@/components/status-badge";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { LiveMap } from "@/components/map/live-map";
 import { PageHeader } from "@/components/admin/page-header";
@@ -64,9 +65,7 @@ export default async function LiveMapPage() {
 
       <div className="flex flex-wrap gap-2 text-xs">
         {(["GREEN", "YELLOW", "RED", "GRAY"] as const).map((s) => (
-          <span key={s} className={`rounded-full border px-2 py-0.5 font-medium ${TRAFFIC_CLASS[s]}`}>
-            {TRAFFIC_LABEL[s]}
-          </span>
+          <TrafficBadge key={s} state={s} />
         ))}
       </div>
 

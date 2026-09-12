@@ -116,7 +116,7 @@ export function TeamRow({ team }: { team: TeamView }) {
                   className="flex flex-wrap items-center gap-2 rounded-md border px-3 py-2 transition-colors hover:border-foreground/20"
                 >
                   <span
-                    className={`size-1.5 rounded-full shrink-0 ${p.online ? "bg-emerald-500" : "bg-muted-foreground/40"}`}
+                    className={`size-1.5 rounded-full shrink-0 ${p.online ? "bg-success" : "bg-muted-foreground/40"}`}
                     title={p.online ? "Online" : "Offline"}
                   />
                   <div className="min-w-0 flex-1">

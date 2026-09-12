@@ -9,8 +9,8 @@ import { adminLogout } from "./login/actions";
 export const metadata = { title: "Admin — Campus Treasure Hunt" };
 
 const STATUS_CLASS: Record<string, string> = {
-  ACTIVE: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30",
-  PAUSED: "bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30",
+  ACTIVE: "bg-success-subtle text-success-strong border-success/30",
+  PAUSED: "bg-warning-subtle text-warning-foreground border-warning/40 dark:text-warning",
   ENDED: "bg-muted text-muted-foreground",
   DRAFT: "bg-muted text-muted-foreground",
 };

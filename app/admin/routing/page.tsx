@@ -1,7 +1,8 @@
 import { requireAdmin } from "@/lib/auth/admin";
 import { prisma } from "@/lib/db";
 import { getCurrentGame } from "@/lib/game-engine/current-game";
-import { getCheckpointTraffic, TRAFFIC_CLASS, TRAFFIC_LABEL } from "@/lib/routing/traffic";
+import { getCheckpointTraffic } from "@/lib/routing/traffic";
+import { TrafficBadge } from "@/components/status-badge";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/admin/page-header";
@@ -92,11 +93,7 @@ export default async function RoutingPage() {
             const state = t?.state ?? "GREEN";
             return (
               <div key={cp.id} className="flex items-center gap-3 rounded-md border px-3 py-2">
-                <span
-                  className={`rounded-full border px-2 py-0.5 text-xs font-medium ${TRAFFIC_CLASS[state]}`}
-                >
-                  {TRAFFIC_LABEL[state]}
-                </span>
+                <TrafficBadge state={state} />
                 <span className="flex-1 truncate text-sm">{cp.name}</span>
                 <span className="text-xs text-muted-foreground tabular-nums">
                   {t?.occupancy ?? 0} present · {t?.approaching ?? 0} approaching · capacity{" "}

@@ -98,9 +98,9 @@ export default async function AdminOverviewPage() {
             <CardTitle className="text-sm font-medium text-muted-foreground">Congestion</CardTitle>
           </CardHeader>
           <CardContent className="flex gap-3 text-sm">
-            <span className="text-red-600 font-medium">{congested} red</span>
-            <span className="text-amber-600 font-medium">{approaching} yellow</span>
-            <span className="text-emerald-600 font-medium">
+            <span className="text-danger font-medium">{congested} red</span>
+            <span className="text-warning-foreground dark:text-warning font-medium">{approaching} yellow</span>
+            <span className="text-success-strong font-medium">
               {states.length - congested - approaching} clear
             </span>
           </CardContent>

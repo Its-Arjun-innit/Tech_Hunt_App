@@ -78,7 +78,7 @@ export default async function ChallengePage({
         </div>
 
         {done ? (
-          <Card className="border-emerald-500/40 bg-emerald-500/5">
+          <Card className="border-success/40 bg-success-subtle/50">
             <CardContent className="pt-6 text-center space-y-3">
               <p className="font-medium">Challenge complete</p>
               <p className="text-sm text-muted-foreground">
@@ -88,7 +88,7 @@ export default async function ChallengePage({
             </CardContent>
           </Card>
         ) : pending ? (
-          <Card className="border-amber-500/40 bg-amber-500/5">
+          <Card className="border-warning/40 bg-warning-subtle/60">
             <CardContent className="pt-6 text-center space-y-3">
               <p className="font-medium">Waiting for a volunteer</p>
               <p className="text-sm text-muted-foreground">
