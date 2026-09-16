@@ -14,7 +14,7 @@ const ONLINE_WINDOW_MS = 3 * 60_000;
 export default async function TeamPage() {
   const { player, team, game } = await requirePlayer();
 
-  const [members, { task, completedScans, challengeCount, leaderboard, totalCheckpoints, rank }] =
+  const [members, { task, completedScans, challengeCount, totalCheckpoints, rank }] =
     await Promise.all([
       prisma.player.findMany({
         where: { teamId: team.id },

@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { APIProvider, Map, AdvancedMarker, useMap, useMapsLibrary } from "@vis.gl/react-google-maps";
 import { MapPin, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { haversine } from "@/lib/routing/engine";
 import { TRAFFIC_FILL } from "@/lib/routing/traffic-presentation";
+import { OsmMap } from "./osm-map";
 
 export type MapPoint = {
   id: string;
@@ -45,9 +45,10 @@ export function CheckpointMap({
   height?: number;
   draggableMarker?: boolean;
 }) {
-  // Without a key the whole Google stack is skipped and a local plot is drawn.
+  // Without a key the whole Google stack is skipped and OpenStreetMap is used,
+  // which needs no key. Same contract either way: click or drag sets coordinates.
   if (!apiKey) {
-    return <FallbackMap value={value} onChange={onChange} points={points} height={height} />;
+    return <OsmMap value={value} onChange={onChange} points={points} height={height} />;
   }
 
   const center = value
@@ -171,107 +172,3 @@ function DistanceLines({
   return null;
 }
 
-/**
- * Key-free plot: checkpoints scaled into a bounding box so organizers can still
- * see relative positions and set coordinates by clicking.
- */
-function FallbackMap({
-  value,
-  onChange,
-  points,
-  height,
-}: {
-  value?: { latitude: number; longitude: number } | null;
-  onChange?: (lat: number, lng: number) => void;
-  points: MapPoint[];
-  height: number;
-}) {
-  const all = useMemo(
-    () => (value ? [...points, { id: "__self", name: "This checkpoint", ...value }] : points),
-    [points, value],
-  );
-
-  const bounds = useMemo(() => {
-    if (all.length === 0) {
-      return { minLat: 28.54, maxLat: 28.55, minLng: 77.185, maxLng: 77.2 };
-    }
-    const lats = all.map((p) => p.latitude);
-    const lngs = all.map((p) => p.longitude);
-    const pad = 0.0008;
-    return {
-      minLat: Math.min(...lats) - pad,
-      maxLat: Math.max(...lats) + pad,
-      minLng: Math.min(...lngs) - pad,
-      maxLng: Math.max(...lngs) + pad,
-    };
-  }, [all]);
-
-  const toPercent = (p: { latitude: number; longitude: number }) => ({
-    left: ((p.longitude - bounds.minLng) / (bounds.maxLng - bounds.minLng)) * 100,
-    top: (1 - (p.latitude - bounds.minLat) / (bounds.maxLat - bounds.minLat)) * 100,
-  });
-
-  const [hint, setHint] = useState<string | null>(null);
-
-  return (
-    <div className="space-y-2">
-      <div
-        style={{ height }}
-        className="relative overflow-hidden rounded-lg border bg-[linear-gradient(to_right,var(--border)_1px,transparent_1px),linear-gradient(to_bottom,var(--border)_1px,transparent_1px)] bg-[size:32px_32px]"
-        onClick={(e) => {
-          if (!onChange) return;
-          const rect = e.currentTarget.getBoundingClientRect();
-          const x = (e.clientX - rect.left) / rect.width;
-          const y = (e.clientY - rect.top) / rect.height;
-          const lat = bounds.maxLat - y * (bounds.maxLat - bounds.minLat);
-          const lng = bounds.minLng + x * (bounds.maxLng - bounds.minLng);
-          onChange(Number(lat.toFixed(6)), Number(lng.toFixed(6)));
-        }}
-      >
-        {points.map((p) => {
-          const pos = toPercent(p);
-          const distance = value ? Math.round(haversine(value, p)) : null;
-          return (
-            <div
-              key={p.id}
-              className="absolute -translate-x-1/2 -translate-y-1/2"
-              style={{ left: `${pos.left}%`, top: `${pos.top}%` }}
-              onMouseEnter={() => setHint(`${p.name}${distance !== null ? ` — ${distance}m` : ""}`)}
-              onMouseLeave={() => setHint(null)}
-            >
-              <div
-                className={`size-3 border-2 border-background shadow ${STATE_SHAPE[p.state ?? "GRAY"]}`}
-                style={{ background: STATE_COLOR[p.state ?? "GRAY"] }}
-              />
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 whitespace-nowrap text-[10px] text-muted-foreground">
-                {p.name}
-                {distance !== null && ` · ${distance}m`}
-              </span>
-            </div>
-          );
-        })}
-
-        {value && (
-          <div
-            className="absolute -translate-x-1/2 -translate-y-full"
-            style={{ left: `${toPercent(value).left}%`, top: `${toPercent(value).top}%` }}
-          >
-            <MapPin className="size-6 text-primary-strong" fill="currentColor" />
-          </div>
-        )}
-
-        {hint && (
-          <p className="absolute bottom-2 left-2 rounded bg-background/90 px-2 py-1 text-xs">
-            {hint}
-          </p>
-        )}
-      </div>
-
-      <p className="text-xs text-muted-foreground">
-        {onChange
-          ? "No Google Maps key configured. Click the grid to set coordinates, or type them below."
-          : "No Google Maps key configured. Showing relative positions only."}
-      </p>
-    </div>
-  );
-}

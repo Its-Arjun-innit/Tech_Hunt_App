@@ -1,17 +1,5 @@
 import { prisma } from "@/lib/db";
 
-export type CurrentObjective = {
-  assignment: Record<string, unknown>;
-  checkpoint: Record<string, unknown>;
-  clue: Record<string, unknown> | null;
-  level: number;
-  maxLevel: number;
-  canRequestMore: boolean;
-  requestCost: number;
-  expiresAt: Date;
-  estimatedTravelTime: number;
-};
-
 /**
  * The clue the team should currently see, taking automatic time-based
  * unlocking into account without needing a background job.
@@ -81,41 +69,15 @@ export type CurrentTask =
  * player surface calls rather than being re-derived per page.
  */
 export async function currentTask(teamId: string): Promise<CurrentTask> {
-  const assignment = await prisma.routingAssignment.findFirst({
-    where: { teamId, status: "ACTIVE" },
-    orderBy: { createdAt: "desc" },
-    include: {
-      checkpoint: {
-        include: { clues: { orderBy: { level: "asc" } }, challenge: true },
-      },
-    },
-  });
-
-  if (assignment) {
-    const game = await prisma.game.findFirst({
-      where: { teams: { some: { id: teamId } } },
-      select: { clueUnlockMode: true, clueUnlockAfterSeconds: true },
-    });
-
-    let level = assignment.clueLevel;
-    if (game && game.clueUnlockMode !== "REQUEST") {
-      const elapsed = (Date.now() - assignment.clueUnlockedAt.getTime()) / 1000;
-      const earned = Math.floor(elapsed / Math.max(game.clueUnlockAfterSeconds, 1));
-      level = Math.min(assignment.clueLevel + earned, assignment.checkpoint.clues.length);
-    }
-
-    const clue =
-      assignment.checkpoint.clues.find((c) => c.level === level) ??
-      assignment.checkpoint.clues[0] ??
-      null;
-
+  const objective = await currentObjective(teamId);
+  if (objective) {
     return {
       kind: "travel",
-      clue: clue?.text ?? null,
-      level,
-      maxLevel: assignment.checkpoint.clues.length,
-      etaSeconds: assignment.estimatedTravelTime,
-      checkpointName: assignment.checkpoint.name,
+      clue: objective.clue?.text ?? null,
+      level: objective.level,
+      maxLevel: objective.maxLevel,
+      etaSeconds: objective.estimatedTravelTime,
+      checkpointName: objective.checkpoint.name,
     };
   }
 

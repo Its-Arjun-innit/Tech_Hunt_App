@@ -1,16 +1,19 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import type { TrafficState } from "@/lib/routing/traffic";
+import { useEffect, useRef, useState } from "react";
 import { TRAFFIC_FILL } from "@/lib/routing/traffic-presentation";
+import type { MapPoint } from "./checkpoint-map";
 
-export type MapPoint = {
-  id: string;
-  name: string;
-  latitude: number;
-  longitude: number;
-  color: string;
-  teamsHere: string[];
+type LatLng = { lat: number; lng: number };
+
+type LeafletMarker = {
+  setLatLng([lat, lng]: [number, number]): LeafletMarker;
+  setIcon(icon: unknown): LeafletMarker;
+  bindPopup(html: string): LeafletMarker;
+  on(event: string, fn: (...args: unknown[]) => void): LeafletMarker;
+  getLatLng(): LatLng;
+  addTo(map: LeafletMap): LeafletMarker;
+  remove(): void;
 };
 
 type LeafletMap = {
@@ -18,14 +21,6 @@ type LeafletMap = {
   invalidateSize(): void;
   setView([lat, lng]: [number, number], zoom: number): LeafletMap;
   on(event: string, fn: (...args: unknown[]) => void): LeafletMap;
-};
-
-type LeafletMarker = {
-  setLatLng([lat, lng]: [number, number]): LeafletMarker;
-  bindPopup(html: string): LeafletMarker;
-  openPopup(): LeafletMarker;
-  addTo(map: LeafletMap): LeafletMarker;
-  remove(): void;
 };
 
 declare global {
@@ -39,145 +34,214 @@ declare global {
   }
 }
 
+const LEAFLET_VERSION = "1.9.4";
+
+/**
+ * Leaflet ships from a CDN rather than npm: it is only ever needed in the
+ * browser, on one screen, and this keeps it out of the bundle entirely.
+ */
+let leafletPromise: Promise<void> | null = null;
+
 function loadLeaflet(): Promise<void> {
   if (typeof window === "undefined") return Promise.resolve();
   if (window.L) return Promise.resolve();
+  if (leafletPromise) return leafletPromise;
 
-  return new Promise((resolve) => {
+  leafletPromise = new Promise((resolve, reject) => {
     const link = document.createElement("link");
     link.rel = "stylesheet";
-    link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+    link.href = `https://unpkg.com/leaflet@${LEAFLET_VERSION}/dist/leaflet.css`;
     document.head.appendChild(link);
 
     const script = document.createElement("script");
-    script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+    script.src = `https://unpkg.com/leaflet@${LEAFLET_VERSION}/dist/leaflet.js`;
     script.onload = () => resolve();
+    script.onerror = () => {
+      leafletPromise = null;
+      reject(new Error("Leaflet failed to load"));
+    };
     document.body.appendChild(script);
   });
+  return leafletPromise;
+}
+
+function dot(color: string, ring: boolean) {
+  return `<div style="background:${color};width:14px;height:14px;border-radius:50%;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,.35)${ring ? ";outline:2px solid " + color + ";outline-offset:2px" : ""}"></div>`;
 }
 
 /**
- * OpenStreetMap-based map using Leaflet. Drop-in alternative to the Google Maps
- * checkpoint-map for projects that want free tile access.
+ * OpenStreetMap view of the checkpoints, used whenever no Google Maps key is
+ * configured. Same contract as the Google path above it: `value` is the point
+ * being edited and clicking or dragging reports new coordinates through
+ * `onChange`.
  *
- * Usage: <OsmMap points={points} height={400} />
+ * Colour comes from the traffic tokens, never a literal, and carries a ring
+ * for "approaching" so state is not signalled by hue alone. See the colour
+ * rules in app/globals.css.
  */
 export function OsmMap({
+  value,
+  onChange,
   points,
-  height = 400,
-  onPointClick,
+  height = 320,
 }: {
+  value?: { latitude: number; longitude: number } | null;
+  onChange?: (lat: number, lng: number) => void;
   points: MapPoint[];
   height?: number;
-  onPointClick?: (pointId: string) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<LeafletMap | null>(null);
-  const markersRef = useRef<Map<string, LeafletMarker>>(new Map());
+  const markersRef = useRef(new Map<string, { marker: LeafletMarker; color: string }>());
+  const valueMarkerRef = useRef<LeafletMarker | null>(null);
+
+  // Leaflet arrives over the network, so the map exists only some time after
+  // mount. The marker effects below are keyed on this: without it they run
+  // once against a null map, find nothing to draw, and never run again.
+  const [ready, setReady] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  // Read through a ref so a new inline callback never tears down the map.
+  const onChangeRef = useRef(onChange);
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
+
+  const center: [number, number] = value
+    ? [value.latitude, value.longitude]
+    : points.length > 0
+      ? [points[0].latitude, points[0].longitude]
+      : [28.5449, 77.1926];
 
   useEffect(() => {
     let cancelled = false;
 
-    async function init() {
-      await loadLeaflet();
-      if (cancelled || !containerRef.current || !window.L) return;
+    loadLeaflet()
+      .then(() => {
+        if (cancelled || mapRef.current || !containerRef.current || !window.L) return;
+        const L = window.L;
 
-      if (mapRef.current) {
-        mapRef.current.invalidateSize();
-        return;
-      }
+        const map = L.map(containerRef.current, { center, zoom: 16 });
+        L.tileLayer(`https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png`, {
+          attribution: '&copy; <a href="https://openstreetmap.org/copyright">OpenStreetMap</a>',
+          maxZoom: 19,
+        }).addTo(map);
 
-      const L = window.L;
+        map.on("click", (e: unknown) => {
+          const { latlng } = e as { latlng: LatLng };
+          onChangeRef.current?.(Number(latlng.lat.toFixed(6)), Number(latlng.lng.toFixed(6)));
+        });
 
-      const map = L.map(containerRef.current, {
-        center: center(points),
-        zoom: 16,
-        zoomControl: true,
-        attributionControl: true,
-      });
+        mapRef.current = map;
+        setReady(true);
+      })
+      .catch(() => setFailed(true));
 
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution: '&copy; <a href="https://openstreetmap.org/copyright">OpenStreetMap</a>',
-        maxZoom: 19,
-      }).addTo(map);
+    return () => {
+      cancelled = true;
+    };
+    // Center is only the initial view; re-centering on every prop change would
+    // fight the organizer panning the map.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-      map.on("click", (e: unknown) => {
-        const event = e as { latlng: { lat: number; lng: number } };
-        if (onPointClick) {
-          const closest = findClosest(points, event.latlng.lat, event.latlng.lng);
-          if (closest) onPointClick(closest.id);
-        }
-      });
-
-      mapRef.current = map;
-    }
-
-    init();
-    return () => { cancelled = true; };
-  }, [points, onPointClick]);
-
+  // Checkpoint markers, kept in step with props.
   useEffect(() => {
-    if (!mapRef.current || !window.L) return;
+    const map = mapRef.current;
     const L = window.L;
+    if (!map || !L) return;
 
-    const current = markersRef.current;
-
+    const live = markersRef.current;
     for (const p of points) {
-      const existing = current.get(p.id);
+      const color = TRAFFIC_FILL[p.state ?? "GREEN"];
+      const icon = L.divIcon({
+        className: "",
+        html: dot(color, p.state === "YELLOW"),
+        iconSize: [14, 14],
+        iconAnchor: [7, 7],
+      });
+      const existing = live.get(p.id);
       if (existing) {
-        existing.setLatLng([p.latitude, p.longitude]);
+        existing.marker.setLatLng([p.latitude, p.longitude]);
+        if (existing.color !== color) {
+          existing.marker.setIcon(icon);
+          existing.color = color;
+        }
       } else {
-        const marker = L.marker([p.latitude, p.longitude], {
-          icon: L.divIcon({
-            className: "checkpoint-marker",
-            html: `<div style="background:${p.color};width:16px;height:16px;border-radius:50%;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.3)"></div>`,
-            iconSize: [16, 16],
-            iconAnchor: [8, 8],
-          }),
-        })
-          .addTo(mapRef.current)
-          .bindPopup(`<strong>${p.name}</strong><br>${p.teamsHere.length} teams here`);
-        current.set(p.id, marker);
+        const marker = L.marker([p.latitude, p.longitude], { icon })
+          .addTo(map)
+          .bindPopup(`<strong>${p.name}</strong>`);
+        live.set(p.id, { marker, color });
       }
     }
 
-    // Remove markers for deleted points
-    for (const [id, marker] of current) {
+    for (const [id, entry] of live) {
       if (!points.find((p) => p.id === id)) {
-        marker.remove();
-        current.delete(id);
+        entry.marker.remove();
+        live.delete(id);
       }
     }
-  }, [points]);
+  }, [points, ready]);
+
+  // The point being edited: draggable, and reports where it lands.
+  useEffect(() => {
+    const map = mapRef.current;
+    const L = window.L;
+    if (!map || !L) return;
+
+    if (!value) {
+      valueMarkerRef.current?.remove();
+      valueMarkerRef.current = null;
+      return;
+    }
+
+    if (valueMarkerRef.current) {
+      valueMarkerRef.current.setLatLng([value.latitude, value.longitude]);
+      return;
+    }
+
+    // A divIcon rather than Leaflet's default marker, whose PNGs resolve
+    // relative to the script and would be a second thing to go wrong offline.
+    const marker = L.marker([value.latitude, value.longitude], {
+      draggable: Boolean(onChangeRef.current),
+      icon: L.divIcon({
+        className: "",
+        html: `<div style="width:20px;height:20px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:var(--primary-strong);border:2px solid white;box-shadow:0 2px 5px rgba(0,0,0,.4)"></div>`,
+        iconSize: [20, 20],
+        iconAnchor: [10, 20],
+      }),
+    }).addTo(map);
+    marker.on("dragend", () => {
+      const { lat, lng } = marker.getLatLng();
+      onChangeRef.current?.(Number(lat.toFixed(6)), Number(lng.toFixed(6)));
+    });
+    valueMarkerRef.current = marker;
+  }, [value, ready]);
 
   useEffect(() => {
+    const live = markersRef.current;
     return () => {
       mapRef.current?.remove();
       mapRef.current = null;
-      markersRef.current.clear();
+      live.clear();
+      valueMarkerRef.current = null;
     };
   }, []);
 
-  return <div ref={containerRef} style={{ height }} className="w-full rounded-xl" />;
-}
-
-function center(points: MapPoint[]): [number, number] {
-  if (points.length === 0) return [0, 0];
-  const lat = points.reduce((s, p) => s + p.latitude, 0) / points.length;
-  const lng = points.reduce((s, p) => s + p.longitude, 0) / points.length;
-  return [lat, lng];
-}
-
-function findClosest(points: MapPoint[], lat: number, lng: number): MapPoint | null {
-  if (points.length === 0) return null;
-  let best = points[0];
-  let bestDist = Infinity;
-  for (const p of points) {
-    const d = (p.latitude - lat) ** 2 + (p.longitude - lng) ** 2;
-    if (d < bestDist) {
-      bestDist = d;
-      best = p;
-    }
-  }
-  return best;
+  return (
+    <div className="space-y-2">
+      <div
+        ref={containerRef}
+        style={{ height }}
+        className="w-full overflow-hidden rounded-lg border bg-muted"
+      />
+      <p className="text-xs text-muted-foreground">
+        {failed
+          ? "The map could not load. Check the network, or type coordinates below."
+          : onChange
+            ? "OpenStreetMap. Click the map or drag the pin to set the location, or type coordinates below."
+            : "OpenStreetMap. No Google Maps key configured."}
+      </p>
+    </div>
+  );
 }

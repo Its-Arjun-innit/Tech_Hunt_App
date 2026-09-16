@@ -19,6 +19,39 @@ Do not "simplify" this by editing `Team.score` directly.
 
 ---
 
+### All scoring goes through `recordScore`
+
+`recordScore` in `lib/scoring/events.ts` creates the `ScoreEvent` and updates the
+cached `Team.score` in one call. Checkpoints, challenges, penalties and clue costs
+all use it.
+
+The two writes are the rule from the entry above, and the rule was previously
+restated at four call sites. Four chances to write one and forget the other, and
+the resulting drift only shows up as a leaderboard that disagrees with a team's
+own activity feed. It also owns the "zero points is not an event" guard, so a
+checkpoint worth nothing no longer writes an empty row.
+
+Take the transaction client as the first argument and keep it that way: these
+writes must land in the same transaction as the scan's row lock.
+
+---
+
+### Traffic data is loaded once, by `loadTrafficContext`
+
+`lib/routing/traffic-context.ts` runs the occupancy, approaching and recent-visit
+queries. The admin traffic view and the routing engine both read it.
+
+Both used to run those three queries with their own copies of the window
+arithmetic, which is how the two views of "how busy is this checkpoint" could
+disagree while both looked correct.
+
+The one asymmetry is deliberate and easy to break: `excludeTeamId` leaves the
+routed team out of occupancy and approaching, because a team should not be
+counted as crowding its own destination — but it is **not** excluded from recent
+visits, which exist to spread teams over time rather than over space.
+
+---
+
 ### Reservations expire by comparison, never by a job
 
 An `ACTIVE`, unexpired `RoutingAssignment` *is* the soft reservation. Expiry is a

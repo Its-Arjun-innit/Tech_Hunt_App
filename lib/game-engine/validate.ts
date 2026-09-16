@@ -3,31 +3,32 @@ import { ScanResult } from "@prisma/client";
 export type ScanInput = {
   gameActive: boolean;
   gameScansLocked: boolean;
-  gameEnforceRouting: boolean;
   gameScoringFrozen: boolean;
   teamActive: boolean;
   checkpointExists: boolean;
-  checkpointGameId: string;
   checkpointActive: boolean;
   checkpointPoints: number;
-  hasChallenge: boolean;
-  alreadyScanned: boolean;
-  assignmentCheckpointId: string | null;
   recentScanCount: number;
-  rateLimit?: number;
 };
 
 export type ScanValidation =
   | { ok: true; pointsAwarded: number }
   | { ok: false; result: ScanResult };
 
+/** Scans per player per minute. DB-backed so it survives serverless restarts. */
 const RATE_LIMIT_PER_MINUTE = 10;
 
 /**
- * Pure validation function: decides whether a scan is valid and how many
- * points to award. No I/O, no database — just data in, decision out.
+ * The synchronous half of scan validation: everything decidable from data
+ * already fetched, plus how many points a success is worth.
  *
- * This is the seam that makes scan validation testable without a database.
+ * The duplicate-scan and routing checks are deliberately NOT here. Both need
+ * their own query inside the same transaction as the row lock, so they live in
+ * processScan where that transaction is. Passing them through this function
+ * would mean placeholder arguments and rules that never run.
+ *
+ * Rejection order matters and is asserted in validate.test.ts: a rate-limited
+ * player is turned away before the token is even looked at.
  */
 export function validateScan(
   input: ScanInput,
@@ -35,9 +36,6 @@ export function validateScan(
 ): ScanValidation {
   if (input.recentScanCount >= rateLimit) {
     return { ok: false, result: ScanResult.RATE_LIMITED };
-  }
-  if (!input.checkpointExists || input.checkpointGameId !== "?") {
-    // checkpointGameId is compared by the caller; here we only flag missing
   }
   if (!input.checkpointExists) {
     return { ok: false, result: ScanResult.INVALID_TOKEN };
@@ -50,19 +48,6 @@ export function validateScan(
   }
   if (!input.checkpointActive) {
     return { ok: false, result: ScanResult.INACTIVE_CHECKPOINT };
-  }
-  if (input.alreadyScanned) {
-    return { ok: false, result: ScanResult.DUPLICATE };
-  }
-  if (
-    input.gameEnforceRouting &&
-    input.assignmentCheckpointId !== null &&
-    input.assignmentCheckpointId !== "?"
-  ) {
-    // Caller handles the actual assignment.checkpointId !== checkpoint.id check
-  }
-  if (input.gameEnforceRouting && input.assignmentCheckpointId !== null) {
-    return { ok: false, result: ScanResult.WRONG_CHECKPOINT };
   }
 
   const pointsAwarded = input.gameScoringFrozen ? 0 : input.checkpointPoints;

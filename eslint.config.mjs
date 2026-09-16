@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Design reference material, not shipped code: mockup pages and a plain
+    // Node screenshot script that is meant to use require().
+    "design-specs/**",
   ]),
 ]);
 

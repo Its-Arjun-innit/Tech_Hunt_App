@@ -65,8 +65,8 @@ different destinations. This is verified behaviour, not theory.
 
 - Engine: `lib/routing/engine.ts` — pure and unit tested, no database
 - Weights: `lib/routing/config.ts` — every one overridable per game from the admin UI
-- Traffic: `lib/routing/traffic.ts` — derived on read, never stored
-- Scan pipeline: `lib/game-engine/process-scan.ts`
+- Traffic: `lib/routing/traffic.ts` and `traffic-context.ts` — derived on read, never stored
+- Scan pipeline: `lib/game-engine/process-scan.ts`, with `validate.ts` beside it
 
 Reservations expire by comparing a timestamp at read time. There is deliberately
 **no cron job and no background worker** anywhere in this app, which is what
@@ -137,19 +137,38 @@ app/
   volunteer/            verification console
 lib/
   auth/                 player and admin sessions, role checks, audit logging
-  game-engine/          processScan, advanceTeam, currentTask, clues
-  routing/              engine, weights, traffic
+  game-engine/          processScan, advanceTeam, game-state, validate, clues
+  routing/              engine, weights, traffic, traffic-context
   challenges/           per-type schemas and server-side grading
-  scoring/              leaderboard from the score ledger
+  scoring/              leaderboard from the score ledger, recordScore
+  queries/              page data shared by the dashboard and team tabs
+  map/                  Nominatim geocoding, unused so far
   announcements.ts      audience and scheduling rules
 scripts/                migrate-deploy, ensure-admin, verification scripts
 ```
 
-`currentTask()` in `lib/game-engine/clues.ts` answers "what should this team do
+`currentTask()` in `lib/game-engine/game-state.ts` answers "what should this team do
 right now". Every player surface calls it. Do not re-derive that logic per page:
 doing so is what caused a team mid-hunt to be told it had finished, because a
 team held at an unsolved challenge has no routing assignment and "no assignment"
-was read as "done".
+was read as "done". It delegates to `currentObjective()` beside it; keep it that
+way rather than repeating the assignment query.
+
+Two other functions are worth knowing before you write anything that touches
+scoring or traffic:
+
+- `recordScore()` in `lib/scoring/events.ts` is the only sanctioned way to move
+  a team's score. It writes the `ScoreEvent` and updates the cached `Team.score`
+  together, so the ledger and the cached sum cannot drift.
+- `loadTrafficContext()` in `lib/routing/traffic-context.ts` loads occupancy,
+  approaching counts and recent visits once. Both the admin traffic view and
+  `advanceTeam` read it; `excludeTeamId` leaves the routed team out of
+  occupancy and approaching, but deliberately not out of recent visits.
+
+`validateScan()` in `lib/game-engine/validate.ts` holds the synchronous half of
+scan validation and is unit tested. The duplicate and routing checks are not
+there on purpose: both need a query inside the same transaction as the row
+lock, so they live in `processScan`.
 
 ---
 
@@ -212,7 +231,7 @@ None of these are broken; they are scoped-out choices worth knowing about.
 | Photo submissions stored as data URLs | Fine for a small event. Move to Supabase Storage before a large one; the column will grow fast. |
 | Roster import is CSV only | Organizers export XLSX to CSV. Add the `xlsx` dependency only if that friction is real. |
 | Route previews are straight lines | Great-circle distance rather than Directions API walking paths. The map is a design tool, so this has not mattered. |
-| Google Maps key not set | Admin map falls back to a coordinate grid that still shows relative positions and distances. Set `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` to enable the real map. |
+| Google Maps key not set | The map falls back to OpenStreetMap, which needs no key and is fully usable — clicking and dragging set coordinates as they do on the Google map. Leaflet and its tiles load from `unpkg.com` and `tile.openstreetmap.org`, so a network blocking those leaves the map blank. Set `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` for the Google path with place search. |
 | No dark mode toggle | The full dark palette exists and works; nothing exposes a switch yet. |
 
 Inventory, rewards and power-ups were excluded by the original spec.

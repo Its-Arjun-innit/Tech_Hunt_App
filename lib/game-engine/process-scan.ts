@@ -54,20 +54,15 @@ export async function processScan(args: {
         }),
       ]);
 
-      // Pure validation: synchronous checks against fetched data
+      // Everything decidable from the rows already fetched.
       const pureCheck = validateScan({
         gameActive: game?.status === "ACTIVE",
         gameScansLocked: game?.scansLocked ?? true,
-        gameEnforceRouting: game?.enforceRouting ?? true,
         gameScoringFrozen: game?.scoringFrozen ?? false,
         teamActive: team?.status === "ACTIVE",
         checkpointExists: !!checkpoint && checkpoint.gameId === args.gameId,
-        checkpointGameId: checkpoint?.gameId ?? "",
         checkpointActive: checkpoint?.active ?? false,
         checkpointPoints: checkpoint?.points ?? 0,
-        hasChallenge: Boolean(checkpoint?.challenge?.active),
-        alreadyScanned: false, // will check below
-        assignmentCheckpointId: null, // will check below
         recentScanCount,
       });
 
