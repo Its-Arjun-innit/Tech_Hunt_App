@@ -7,6 +7,10 @@ same place.
 Single Next.js project. Deploys to Vercel with Supabase PostgreSQL. No separate
 backend, no Redis, no websocket server.
 
+Picking this up fresh? Start with [docs/HANDOFF.md](docs/HANDOFF.md) for current
+state and gotchas, and [docs/DECISIONS.md](docs/DECISIONS.md) for why the
+architecture looks the way it does.
+
 ---
 
 ## The game loop

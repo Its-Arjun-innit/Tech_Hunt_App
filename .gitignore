@@ -48,3 +48,6 @@ next-env.d.ts
 
 .vercel
 .env*
+
+# local archive of the repo, not a build input
+Tech_Hunt_App-main.zip
