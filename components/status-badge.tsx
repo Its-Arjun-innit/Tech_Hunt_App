@@ -1,11 +1,11 @@
 import { AlertTriangle, ArrowRight, CircleCheck, PowerOff } from "lucide-react";
 import { cn } from "cn";
+import type { TrafficState } from "@/lib/routing/traffic";
 import {
   TRAFFIC_CLASS,
   TRAFFIC_ICON,
   TRAFFIC_LABEL,
-  type TrafficState,
-} from "@/lib/routing/traffic";
+} from "@/lib/routing/traffic-presentation";
 
 const ICONS = {
   check: CircleCheck,

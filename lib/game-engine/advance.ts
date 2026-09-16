@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { chooseNextCheckpoint, type RouteCandidate } from "@/lib/routing/engine";
 import { resolveRoutingConfig } from "@/lib/routing/config";
+import { loadTrafficContext } from "@/lib/routing/traffic-context";
 
 export type NextObjective = {
   checkpointId: string;
@@ -31,11 +32,9 @@ export async function advanceTeam(
   },
 ): Promise<NextObjective | null> {
   const cfg = resolveRoutingConfig(args.routingConfig);
-  const now = new Date();
-  const occupancySince = new Date(now.getTime() - cfg.occupancyWindowSeconds * 1000);
-  const recentSince = new Date(now.getTime() - cfg.recentVisitWindowSeconds * 1000);
 
-  const [checkpoints, allowed, liveAssignments, recentScans, teamScans] = await Promise.all([
+  const [trafficCtx, checkpointsWithClues, allowed, teamScans] = await Promise.all([
+    loadTrafficContext(tx, { gameId: args.gameId, excludeTeamId: args.teamId, config: cfg }),
     tx.checkpoint.findMany({
       where: { gameId: args.gameId },
       include: { clues: { orderBy: { level: "asc" } } },
@@ -46,19 +45,6 @@ export async function advanceTeam(
           select: { toId: true },
         })
       : Promise.resolve([] as { toId: string }[]),
-    tx.routingAssignment.findMany({
-      where: {
-        status: "ACTIVE",
-        expiresAt: { gt: now },
-        teamId: { not: args.teamId },
-        team: { gameId: args.gameId },
-      },
-      select: { checkpointId: true },
-    }),
-    tx.scanEvent.findMany({
-      where: { result: "SUCCESS", createdAt: { gte: recentSince }, team: { gameId: args.gameId } },
-      select: { checkpointId: true, teamId: true, createdAt: true },
-    }),
     tx.scanEvent.findMany({
       where: { result: "SUCCESS", teamId: args.teamId },
       select: { checkpointId: true },
@@ -68,32 +54,11 @@ export async function advanceTeam(
   const allowedIds = new Set(allowed.map((r) => r.toId));
   const visited = new Set(teamScans.map((s) => s.checkpointId).filter(Boolean) as string[]);
 
-  const approaching = new Map<string, number>();
-  for (const a of liveAssignments) {
-    approaching.set(a.checkpointId, (approaching.get(a.checkpointId) ?? 0) + 1);
-  }
-
-  const latestByTeam = new Map<string, { checkpointId: string; at: Date }>();
-  const recentVisits = new Map<string, number>();
-  for (const s of recentScans) {
-    if (!s.checkpointId) continue;
-    recentVisits.set(s.checkpointId, (recentVisits.get(s.checkpointId) ?? 0) + 1);
-    const prev = latestByTeam.get(s.teamId);
-    if (!prev || prev.at < s.createdAt) {
-      latestByTeam.set(s.teamId, { checkpointId: s.checkpointId, at: s.createdAt });
-    }
-  }
-  const occupancy = new Map<string, number>();
-  for (const [teamId, v] of latestByTeam) {
-    if (teamId === args.teamId || v.at < occupancySince) continue;
-    occupancy.set(v.checkpointId, (occupancy.get(v.checkpointId) ?? 0) + 1);
-  }
-
   const from = args.fromCheckpointId
-    ? checkpoints.find((c) => c.id === args.fromCheckpointId) ?? null
+    ? checkpointsWithClues.find((c) => c.id === args.fromCheckpointId) ?? null
     : null;
 
-  const candidates: RouteCandidate[] = checkpoints
+  const candidates: RouteCandidate[] = checkpointsWithClues
     .filter((c) => c.id !== args.fromCheckpointId)
     .map((c) => ({
       id: c.id,
@@ -104,9 +69,9 @@ export async function advanceTeam(
       difficulty: c.difficulty,
       active: c.active,
       routeGroup: c.routeGroup,
-      occupancy: occupancy.get(c.id) ?? 0,
-      approaching: approaching.get(c.id) ?? 0,
-      recentVisits: recentVisits.get(c.id) ?? 0,
+      occupancy: trafficCtx.occupancy.get(c.id) ?? 0,
+      approaching: trafficCtx.approaching.get(c.id) ?? 0,
+      recentVisits: trafficCtx.recentVisits.get(c.id) ?? 0,
       visitedByTeam: visited.has(c.id),
       allowedNext: allowedIds.has(c.id),
     }));
@@ -117,14 +82,14 @@ export async function advanceTeam(
       : null,
     candidates,
     visitedCount: visited.size,
-    totalCheckpoints: checkpoints.length,
+    totalCheckpoints: checkpointsWithClues.length,
     config: cfg,
     random: args.random,
   });
 
   if (!decision) return null;
 
-  const target = checkpoints.find((c) => c.id === decision.checkpointId)!;
+  const target = checkpointsWithClues.find((c) => c.id === decision.checkpointId)!;
   const firstClue = target.clues[0] ?? null;
   const reason = `Selected ${target.name}: ${decision.reason.join("; ")}.`;
 
@@ -144,7 +109,7 @@ export async function advanceTeam(
       estimatedTravelTime: decision.estimatedTravelTime,
       clueId: firstClue?.id ?? null,
       clueLevel: 1,
-      expiresAt: new Date(now.getTime() + cfg.reservationTtlSeconds * 1000),
+      expiresAt: new Date(Date.now() + cfg.reservationTtlSeconds * 1000),
     },
   });
 

@@ -1,5 +1,7 @@
 import { ScanResult, type Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { recordScore } from "@/lib/scoring/events";
+import { validateScan, SCAN_MESSAGES } from "./validate";
 import { advanceTeam, type NextObjective } from "./advance";
 
 export type ScanOutcome =
@@ -14,20 +16,6 @@ export type ScanOutcome =
       finished: boolean;
     }
   | { ok: false; result: ScanResult; message: string };
-
-/** Scans per player per minute. DB-backed so it survives serverless restarts. */
-const RATE_LIMIT_PER_MINUTE = 10;
-
-const MESSAGES: Record<ScanResult, string> = {
-  SUCCESS: "Checkpoint completed.",
-  DUPLICATE: "Your team has already completed this checkpoint.",
-  INVALID_TOKEN: "That QR code is not recognised.",
-  INACTIVE_CHECKPOINT: "This checkpoint is currently disabled.",
-  WRONG_CHECKPOINT: "This is not your assigned checkpoint. Follow your current clue.",
-  GAME_NOT_ACTIVE: "The game is not running right now.",
-  TEAM_DISABLED: "Your team is not active. Contact an organizer.",
-  RATE_LIMITED: "Too many scans. Wait a moment and try again.",
-};
 
 /**
  * The whole scan pipeline: validate, record, score, route, reserve, clue.
@@ -51,7 +39,7 @@ export async function processScan(args: {
 
       const reject = async (result: ScanResult, checkpointId: string | null) => {
         await recordScan(tx, { ...args, checkpointId, result, pointsAwarded: 0 });
-        return { ok: false as const, result, message: MESSAGES[result] };
+        return { ok: false as const, result, message: SCAN_MESSAGES[result] };
       };
 
       const [game, team, checkpoint, recentScanCount] = await Promise.all([
@@ -66,54 +54,65 @@ export async function processScan(args: {
         }),
       ]);
 
-      if (recentScanCount >= RATE_LIMIT_PER_MINUTE) {
-        return reject(ScanResult.RATE_LIMITED, null);
-      }
-      if (!checkpoint || checkpoint.gameId !== args.gameId) {
-        return reject(ScanResult.INVALID_TOKEN, null);
-      }
-      if (!game || game.status !== "ACTIVE" || game.scansLocked) {
-        return reject(ScanResult.GAME_NOT_ACTIVE, checkpoint.id);
-      }
-      if (!team || team.status !== "ACTIVE") {
-        return reject(ScanResult.TEAM_DISABLED, checkpoint.id);
-      }
-      if (!checkpoint.active) {
-        return reject(ScanResult.INACTIVE_CHECKPOINT, checkpoint.id);
+      // Pure validation: synchronous checks against fetched data
+      const pureCheck = validateScan({
+        gameActive: game?.status === "ACTIVE",
+        gameScansLocked: game?.scansLocked ?? true,
+        gameEnforceRouting: game?.enforceRouting ?? true,
+        gameScoringFrozen: game?.scoringFrozen ?? false,
+        teamActive: team?.status === "ACTIVE",
+        checkpointExists: !!checkpoint && checkpoint.gameId === args.gameId,
+        checkpointGameId: checkpoint?.gameId ?? "",
+        checkpointActive: checkpoint?.active ?? false,
+        checkpointPoints: checkpoint?.points ?? 0,
+        hasChallenge: Boolean(checkpoint?.challenge?.active),
+        alreadyScanned: false, // will check below
+        assignmentCheckpointId: null, // will check below
+        recentScanCount,
+      });
+
+      if (!pureCheck.ok) {
+        const checkpointId = checkpoint?.id ?? null;
+        return reject(pureCheck.result, checkpointId);
       }
 
+      // At this point, game, team, checkpoint are validated as existing and correct
+      const gameData = game!;
+      const teamData = team!;
+      const checkpointData = checkpoint!;
+
+      // DB-dependent validation: duplicate scan check
       const alreadyDone = await tx.scanEvent.findFirst({
-        where: { teamId: team.id, checkpointId: checkpoint.id, result: "SUCCESS" },
+        where: { teamId: teamData.id, checkpointId: checkpointData.id, result: "SUCCESS" },
         select: { id: true },
       });
-      if (alreadyDone) return reject(ScanResult.DUPLICATE, checkpoint.id);
+      if (alreadyDone) return reject(ScanResult.DUPLICATE, checkpointData.id);
 
-      // Routing enforcement: the team must scan the checkpoint it was sent to.
-      // The very first scan of the game has no assignment yet, so it is allowed.
+      // DB-dependent validation: routing enforcement
       const assignment = await tx.routingAssignment.findFirst({
-        where: { teamId: team.id, status: "ACTIVE" },
+        where: { teamId: teamData.id, status: "ACTIVE" },
         orderBy: { createdAt: "desc" },
       });
-      if (game.enforceRouting && assignment && assignment.checkpointId !== checkpoint.id) {
-        return reject(ScanResult.WRONG_CHECKPOINT, checkpoint.id);
+      if (
+        gameData.enforceRouting &&
+        assignment &&
+        assignment.checkpointId !== checkpointData.id
+      ) {
+        return reject(ScanResult.WRONG_CHECKPOINT, checkpointData.id);
       }
 
       // ── Commit the success ────────────────────────────────────────
-      const pointsAwarded = game.scoringFrozen ? 0 : checkpoint.points;
+      const pointsAwarded = pureCheck.pointsAwarded;
 
-      if (pointsAwarded > 0) {
-        await tx.scoreEvent.create({
-          data: {
-            teamId: team.id,
-            type: "CHECKPOINT",
-            points: pointsAwarded,
-            refId: checkpoint.id,
-            note: `Checkpoint: ${checkpoint.name}`,
-          },
-        });
-      }
+      await recordScore(tx, {
+        teamId: teamData.id,
+        points: pointsAwarded,
+        type: "CHECKPOINT",
+        refId: checkpointData.id,
+        note: `Checkpoint: ${checkpointData.name}`,
+      });
 
-      if (assignment && assignment.checkpointId === checkpoint.id) {
+      if (assignment && assignment.checkpointId === checkpointData.id) {
         await tx.routingAssignment.update({
           where: { id: assignment.id },
           data: { status: "COMPLETED" },
@@ -121,30 +120,27 @@ export async function processScan(args: {
       }
 
       const updatedTeam = await tx.team.update({
-        where: { id: team.id },
-        data: {
-          score: { increment: pointsAwarded },
-          currentCheckpointId: checkpoint.id,
-        },
+        where: { id: teamData.id },
+        data: { currentCheckpointId: checkpointData.id },
       });
 
       // A checkpoint with a challenge holds the team here until it is solved;
       // routing runs once the challenge resolves.
-      const hasChallenge = Boolean(checkpoint.challenge?.active);
+      const hasChallenge = Boolean(checkpointData.challenge?.active);
       let next: NextObjective | null = null;
       if (!hasChallenge) {
         next = await advanceTeam(tx, {
           gameId: args.gameId,
-          teamId: team.id,
-          fromCheckpointId: checkpoint.id,
-          routingConfig: game.routingConfig,
+          teamId: teamData.id,
+          fromCheckpointId: checkpointData.id,
+          routingConfig: gameData.routingConfig,
           random: args.random,
         });
       }
 
       await recordScan(tx, {
         ...args,
-        checkpointId: checkpoint.id,
+        checkpointId: checkpointData.id,
         result: ScanResult.SUCCESS,
         pointsAwarded,
         routingReason: next?.reason ?? null,
@@ -153,9 +149,9 @@ export async function processScan(args: {
       await tx.gameEvent.create({
         data: {
           gameId: args.gameId,
-          teamId: team.id,
+          teamId: teamData.id,
           type: "CHECKPOINT_COMPLETED",
-          message: `${team.name} completed ${checkpoint.name} (+${pointsAwarded})`,
+          message: `${teamData.name} completed ${checkpointData.name} (+${pointsAwarded})`,
         },
       });
 
@@ -163,15 +159,15 @@ export async function processScan(args: {
         where: { gameId: args.gameId, active: true },
       });
       const completed = await tx.scanEvent.count({
-        where: { teamId: team.id, result: "SUCCESS" },
+        where: { teamId: teamData.id, result: "SUCCESS" },
       });
 
       return {
         ok: true as const,
-        checkpointName: checkpoint.name,
+        checkpointName: checkpointData.name,
         pointsAwarded,
         teamScore: updatedTeam.score,
-        challengeId: hasChallenge ? checkpoint.challenge!.id : null,
+        challengeId: hasChallenge ? checkpointData.challenge!.id : null,
         next,
         finished: !hasChallenge && next === null && completed >= totalCheckpoints,
       };

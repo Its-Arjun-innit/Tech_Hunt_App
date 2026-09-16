@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Team — Campus Hunt</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg: #1a2119; --surface: #242e22;
+    --primary: #80D917; --primary-fg: #1a2e0a;
+    --success: #30B566; --text: #F5F3F0; --text-muted: #9BA396; --text-faint: #7A8275;
+    --border: rgba(255,255,255,0.08);
+    --radius: 14px; --radius-sm: 10px;
+  }
+  body { font-family: 'Inter', -apple-system, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; overflow: hidden; }
+  .grain { position: fixed; inset: 0; opacity: 0.03; pointer-events: none; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); background-size: 128px; z-index: 100; }
+  .status-bar { position: absolute; top: 0; left: 0; right: 0; height: 54px; display: flex; align-items: flex-end; justify-content: space-between; padding: 0 28px 8px; font-size: 14px; font-weight: 600; z-index: 10; }
+  .status-bar .icons { display: flex; gap: 6px; }
+  .status-bar .icons svg { width: 16px; height: 16px; fill: var(--text); }
+  .home-indicator { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); width: 134px; height: 5px; background: rgba(255,255,255,0.2); border-radius: 3px; z-index: 10; }
+
+  .screen { padding-top: 54px; padding-bottom: 80px; }
+  .header { padding: 20px 20px 16px; border-bottom: 1px solid var(--border); }
+  .header .label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-muted); }
+  .header h1 { font-size: 26px; font-weight: 800; margin-top: 4px; }
+  .header p { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+
+  .content { padding: 20px; }
+
+  .stat-strip { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+  .stat-tile {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 14px 12px; text-align: center;
+  }
+  .stat-tile .icon { display: flex; justify-content: center; margin-bottom: 6px; }
+  .stat-tile .icon svg { width: 14px; height: 14px; stroke: var(--text-muted); fill: none; stroke-width: 2; }
+  .stat-tile .value { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .stat-tile .label { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+  .section { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 14px; }
+  .section-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-muted); }
+
+  .member-list { margin-top: 12px; }
+  .member-item { display: flex; align-items: center; gap: 10px; padding: 8px 0; }
+  .member-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .member-dot.online { background: var(--success); box-shadow: 0 0 6px rgba(48,181,102,0.4); }
+  .member-dot.offline { background: var(--text-faint); opacity: 0.4; }
+  .member-name { flex: 1; font-size: 14px; }
+  .member-you { font-size: 11px; color: var(--text-faint); margin-left: 4px; }
+  .member-status { font-size: 12px; color: var(--text-faint); }
+
+  .progress-rows { margin-top: 12px; }
+  .progress-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); }
+  .progress-row:last-child { border-bottom: none; }
+  .progress-row .key { font-size: 13px; color: var(--text-muted); }
+  .progress-row .val { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 5px; }
+  .progress-row .val svg { width: 12px; height: 12px; stroke: var(--text-muted); fill: none; stroke-width: 2; }
+
+  .btn-outline {
+    display: block; width: 100%; height: 48px; margin-top: 6px;
+    background: transparent; color: var(--text-muted); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); font-size: 14px; font-weight: 600;
+    font-family: inherit; cursor: pointer;
+  }
+
+  .bottom-nav {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    background: var(--surface); border-top: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-around;
+    padding: 8px 0 20px; z-index: 10;
+  }
+  .nav-item { display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 10px; color: var(--text-faint); min-width: 50px; }
+  .nav-item.active { color: var(--primary); }
+  .nav-item svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.8; }
+  .scan-btn { width: 56px; height: 56px; background: var(--primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-top: -28px; box-shadow: 0 4px 20px rgba(128,217,23,0.35); }
+  .scan-btn svg { width: 26px; height: 26px; stroke: var(--primary-fg); fill: none; stroke-width: 2; }
+</style>
+</head>
+<body>
+  <div class="grain"></div>
+  <div class="status-bar">
+    <span>9:41</span>
+    <span class="icons">
+      <svg viewBox="0 0 24 24"><path d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9zm8 8l3 3 3-3c-1.65-1.66-4.34-1.66-6 0zm-4-4l2 2c2.76-2.76 7.24-2.76 10 0l2-2C15.14 9.14 8.87 9.14 5 13z"/></svg>
+      <svg viewBox="0 0 24 24"><path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z"/></svg>
+    </span>
+  </div>
+
+  <div class="screen">
+    <div class="header">
+      <div class="label">Your Team</div>
+      <h1>Alpha Squad</h1>
+      <p>5 members · 3 online</p>
+    </div>
+
+    <div class="content">
+      <div class="stat-strip">
+        <div class="stat-tile">
+          <div class="icon">
+            <svg viewBox="0 0 24 24"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5C7 4 7 8 12 8s5-4 7.5-4a2.5 2.5 0 0 1 0 5H18"/><path d="M12 2v20"/><path d="M6 15h12"/><path d="M6 15c0 3 2.69 5 6 5s6-2 6-5"/></svg>
+          </div>
+          <div class="value">2,450</div>
+          <div class="label">Score</div>
+        </div>
+        <div class="stat-tile">
+          <div class="icon">
+            <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </div>
+          <div class="value">#3</div>
+          <div class="label">Rank</div>
+        </div>
+        <div class="stat-tile">
+          <div class="icon">
+            <svg viewBox="0 0 24 24"><path d="M14 4l2.29 2.29-2.88 2.88 1.42 1.42 2.88-2.88L20 10V4zm-4 0H4v6l2.29-2.29 4.71 4.7V20h2v-8.41l-5.29-5.3z"/></svg>
+          </div>
+          <div class="value">7/12</div>
+          <div class="label">Checkpoints</div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Members</div>
+        <div class="member-list">
+          <div class="member-item">
+            <div class="member-dot online"></div>
+            <div class="member-name">Alex Chen <span class="member-you">you</span></div>
+            <div class="member-status">Online</div>
+          </div>
+          <div class="member-item">
+            <div class="member-dot online"></div>
+            <div class="member-name">Jordan Park</div>
+            <div class="member-status">Online</div>
+          </div>
+          <div class="member-item">
+            <div class="member-dot online"></div>
+            <div class="member-name">Sam Rivera</div>
+            <div class="member-status">Online</div>
+          </div>
+          <div class="member-item">
+            <div class="member-dot offline"></div>
+            <div class="member-name">Taylor Kim</div>
+            <div class="member-status">Offline</div>
+          </div>
+          <div class="member-item">
+            <div class="member-dot offline"></div>
+            <div class="member-name">Casey Morgan</div>
+            <div class="member-status">Offline</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Progress</div>
+        <div class="progress-rows">
+          <div class="progress-row">
+            <span class="key">Checkpoints completed</span>
+            <span class="val">7 of 12</span>
+          </div>
+          <div class="progress-row">
+            <span class="key">Challenges completed</span>
+            <span class="val">
+              <svg viewBox="0 0 24 24"><path d="M20.5 11H19V7c0-1.1-.9-2-2-2h-4V3.5C13 2.12 11.88 1 10.5 1S8 2.12 8 3.5V5H4c-1.1 0-2 .9-2 2v3.8h1.5c1.38 0 2.5 1.12 2.5 2.5S4.88 15.8 3.5 15.8H2V20c0 1.1.9 2 2 2h3.8v-1.5c0-1.38 1.12-2.5 2.5-2.5s2.5 1.12 2.5 2.5V22H17c1.1 0 2-.9 2-2v-4h1.5c1.38 0 2.5-1.12 2.5-2.5S21.88 11 20.5 11z"/></svg>
+              3
+            </span>
+          </div>
+          <div class="progress-row">
+            <span class="key">Current objective</span>
+            <span class="val">Travelling to next clue</span>
+          </div>
+        </div>
+      </div>
+
+      <button class="btn-outline">Sign out</button>
+    </div>
+  </div>
+
+  <nav class="bottom-nav">
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+      Home
+    </div>
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
+      Clue
+    </div>
+    <div class="nav-item">
+      <div class="scan-btn">
+        <svg viewBox="0 0 24 24"><path d="M3 7V5c0-1.1.9-2 2-2h2M17 3h2c1.1 0 2 .9 2 2v2M21 17v2c0 1.1-.9 2-2 2h-2M7 21H5c-1.1 0-2-.9-2-2v-2"/><line x1="7" y1="12" x2="17" y2="12"/></svg>
+      </div>
+    </div>
+    <div class="nav-item active">
+      <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      Team
+    </div>
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      Activity
+    </div>
+  </nav>
+
+  <div class="home-indicator"></div>
+</body>
+</html>

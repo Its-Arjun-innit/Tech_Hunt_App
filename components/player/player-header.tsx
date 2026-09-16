@@ -29,44 +29,42 @@ export function PlayerHeader({
   endsAt: string | null;
 }) {
   return (
-    <header className="border-b bg-surface">
-      <div className="mx-auto max-w-lg px-5 pt-5 pb-4">
+    <header className="border-b border-border/50 bg-surface/80 backdrop-blur-sm">
+      <div className="mx-auto max-w-lg px-5 pt-6 pb-5">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            <p className="text-xs font-medium text-faint-foreground">
               Your team
             </p>
-            <h1 className="text-lg font-semibold truncate">{teamName}</h1>
+            <h1 className="mt-0.5 text-xl font-semibold tracking-tight text-foreground truncate">{teamName}</h1>
           </div>
           {status !== "ACTIVE" && (
             <StatusPill tone={gameStatusTone(status)}>{status.toLowerCase()}</StatusPill>
           )}
         </div>
 
-        <div className="mt-4 flex items-end justify-between gap-4">
+        <div className="mt-5 flex items-end justify-between gap-4">
           <div>
-            <p className="text-display text-primary-strong">
+            <p className="text-hero text-primary-strong leading-none">
               <CountUp value={score} />
             </p>
-            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              points
-            </p>
+            <p className="mt-1 text-xs font-medium text-faint-foreground">points</p>
           </div>
 
           <Link
             href="/leaderboard"
-            className="group rounded-lg px-2 py-1 text-right outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+            className="group rounded-xl px-3 py-2 text-right outline-none transition-colors hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50"
           >
-            <p className="flex items-center justify-end gap-1 text-2xl font-semibold tabular-nums">
+            <p className="flex items-center justify-end gap-1.5 text-2xl font-semibold tabular-nums text-foreground">
               <Trophy className="size-4 text-muted-foreground" />#{rank}
-              <ChevronRight className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+              <ChevronRight className="size-4 text-muted-foreground transition-transform duration-200 group-hover:translate-x-0.5" />
             </p>
-            <p className="text-xs text-muted-foreground">of {totalTeams} teams</p>
+            <p className="mt-0.5 text-xs text-faint-foreground">of {totalTeams} teams</p>
           </Link>
         </div>
 
-        <div className="mt-4 flex items-center justify-between gap-3 rounded-lg bg-muted/60 px-3 py-2">
-          <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+        <div className="mt-5 flex items-center justify-between gap-3 rounded-xl bg-muted/40 px-4 py-2.5">
+          <span className="text-xs font-medium text-faint-foreground">
             {status === "ENDED" ? "Final" : "Time"}
           </span>
           <GameTimer status={status} startsAt={startsAt} endsAt={endsAt} compact />

@@ -1,9 +1,6 @@
 import { Bell, Flag, Puzzle } from "lucide-react";
 import { requirePlayer } from "@/lib/auth/player";
-import { prisma } from "@/lib/db";
-import { currentTask } from "@/lib/game-engine/clues";
-import { getLeaderboard } from "@/lib/scoring/leaderboard";
-import { visibleToTeam } from "@/lib/announcements";
+import { getDashboardData } from "@/lib/queries/dashboard";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { PlayerHeader } from "@/components/player/player-header";
 import { ObjectiveCard } from "@/components/player/objective-card";
@@ -14,27 +11,11 @@ export const dynamic = "force-dynamic";
 export default async function DashboardPage() {
   const { team, game } = await requirePlayer();
 
-  const [task, completedScans, challengeCount, leaderboard, announcements, totalCheckpoints] =
-    await Promise.all([
-      currentTask(team.id),
-      prisma.scanEvent.count({ where: { teamId: team.id, result: "SUCCESS" } }),
-      prisma.challengeAttempt.count({ where: { teamId: team.id, status: "SUCCESS" } }),
-      getLeaderboard(game.id),
-      prisma.announcement.findMany({
-        where: { gameId: game.id },
-        orderBy: { createdAt: "desc" },
-        take: 3,
-      }),
-      prisma.checkpoint.count({ where: { gameId: game.id, active: true } }),
-    ]);
-
-  const rank = leaderboard.find((r) => r.teamId === team.id)?.rank ?? leaderboard.length;
-  // Audience and scheduling are both decided by one helper, so the player and
-  // volunteer surfaces cannot drift apart on who sees what.
-  const mine = announcements.filter((a) => visibleToTeam(a, team.id));
+  const { task, completedScans, challengeCount, leaderboard, totalCheckpoints, announcements, rank } =
+    await getDashboardData(team.id, game.id);
 
   return (
-    <main className="flex-1">
+    <main className="flex-1 grain">
       <AutoRefresh seconds={8} />
 
       <PlayerHeader
@@ -47,7 +28,7 @@ export default async function DashboardPage() {
         endsAt={game.endsAt?.toISOString() ?? null}
       />
 
-      <div className="mx-auto w-full max-w-lg space-y-4 px-5 py-5">
+      <div className="mx-auto w-full max-w-lg space-y-5 px-5 py-6">
         {game.status !== "ACTIVE" && <GameStateNotice status={game.status} />}
 
         <ObjectiveCard
@@ -64,30 +45,33 @@ export default async function DashboardPage() {
           }
         />
 
-        {/* Progress, kept small: it answers "how are we doing", not "what now". */}
-        <div className="grid grid-cols-2 gap-3">
+        {/* Progress stats with elevated cards */}
+        <div className="grid grid-cols-2 gap-4">
           <MiniStat
-            icon={<Flag className="size-3.5" />}
+            icon={<Flag className="size-4" />}
             label="Checkpoints"
             value={`${completedScans}/${totalCheckpoints}`}
           />
           <MiniStat
-            icon={<Puzzle className="size-3.5" />}
+            icon={<Puzzle className="size-4" />}
             label="Challenges"
             value={challengeCount}
           />
         </div>
 
-        {mine.length > 0 && (
-          <section className="rounded-xl border bg-surface p-4">
-            <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              <Bell className="size-3.5" /> Announcements
+        {announcements.length > 0 && (
+          <section className="rounded-2xl border border-border/50 bg-surface/80 p-5 card-elevated transition-all duration-300">
+            <p className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
+              <span className="flex size-6 items-center justify-center rounded-lg bg-primary/10">
+                <Bell className="size-3.5 text-primary-strong" />
+              </span>
+              Announcements
             </p>
-            <ul className="mt-3 space-y-3">
-              {mine.map((a) => (
-                <li key={a.id}>
-                  <p className="text-sm leading-snug">{a.message}</p>
-                  <p className="mt-0.5 text-xs text-faint-foreground">
+            <ul className="mt-4 space-y-4">
+              {announcements.map((a) => (
+                <li key={a.id} className="group">
+                  <p className="text-sm leading-relaxed text-foreground/90">{a.message}</p>
+                  <p className="mt-1 text-xs text-faint-foreground">
                     {a.createdAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                   </p>
                 </li>
@@ -110,12 +94,14 @@ function MiniStat({
   value: React.ReactNode;
 }) {
   return (
-    <div className="rounded-xl border bg-surface px-4 py-3">
-      <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-        {icon}
-        {label}
-      </p>
-      <p className="mt-1 text-xl font-semibold tabular-nums">{value}</p>
+    <div className="group rounded-2xl border border-border/50 bg-surface/80 px-4 py-4 card-elevated transition-all duration-300 hover:border-border-strong/50">
+      <div className="flex items-center gap-2">
+        <span className="flex size-7 items-center justify-center rounded-lg bg-primary/10 text-primary-strong">
+          {icon}
+        </span>
+        <p className="text-xs font-medium text-muted-foreground">{label}</p>
+      </div>
+      <p className="mt-2.5 text-2xl font-semibold tabular-nums text-foreground">{value}</p>
     </div>
   );
 }
@@ -127,8 +113,8 @@ function GameStateNotice({ status }: { status: string }) {
     ENDED: "The hunt has ended. Scores are final.",
   };
   return (
-    <p className="rounded-xl border border-warning/40 bg-warning-subtle px-4 py-3 text-sm">
-      {copy[status] ?? status}
-    </p>
+    <div className="rounded-2xl border border-warning/30 bg-gradient-to-r from-warning-subtle to-warning-subtle/50 px-5 py-4">
+      <p className="text-sm font-medium text-warning-foreground">{copy[status] ?? status}</p>
+    </div>
   );
 }

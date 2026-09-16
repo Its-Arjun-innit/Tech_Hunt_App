@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowLeft, Compass, Footprints } from "lucide-react";
 import { requirePlayer } from "@/lib/auth/player";
 import { prisma } from "@/lib/db";
-import { currentObjective } from "@/lib/game-engine/clues";
+import { currentObjective } from "@/lib/game-engine/game-state";
 import { Button } from "@/components/ui/button";
 import { ClueLevels } from "@/components/player/clue-levels";
 

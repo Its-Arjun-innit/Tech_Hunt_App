@@ -5,7 +5,7 @@ import { APIProvider, Map, AdvancedMarker, useMap, useMapsLibrary } from "@vis.g
 import { MapPin, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { haversine } from "@/lib/routing/engine";
-import { TRAFFIC_FILL } from "@/lib/routing/traffic";
+import { TRAFFIC_FILL } from "@/lib/routing/traffic-presentation";
 
 export type MapPoint = {
   id: string;

@@ -68,6 +68,11 @@ export function gradeSubmission(args: {
         ? { status: "SUCCESS" }
         : { status: "STAGE_CLEARED", nextStage: next };
     }
+
+    default: {
+      const _exhaustive: never = args.type;
+      return { status: "FAILED", message: `Unknown challenge type: ${_exhaustive}` };
+    }
   }
 }
 

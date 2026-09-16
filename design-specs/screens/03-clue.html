@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Clue — Campus Hunt</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg: #1a2119; --surface: #242e22;
+    --primary: #80D917; --primary-fg: #1a2e0a; --primary-strong: #5CB80A;
+    --success: #30B566; --text: #F5F3F0; --text-muted: #9BA396; --text-faint: #7A8275;
+    --border: rgba(255,255,255,0.08); --border-strong: rgba(255,255,255,0.15);
+    --radius: 14px; --radius-sm: 10px;
+  }
+  body { font-family: 'Inter', -apple-system, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; overflow: hidden; }
+  .grain { position: fixed; inset: 0; opacity: 0.03; pointer-events: none; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); background-size: 128px; z-index: 100; }
+  .status-bar { position: absolute; top: 0; left: 0; right: 0; height: 54px; display: flex; align-items: flex-end; justify-content: space-between; padding: 0 28px 8px; font-size: 14px; font-weight: 600; z-index: 10; }
+  .status-bar .icons { display: flex; gap: 6px; }
+  .status-bar .icons svg { width: 16px; height: 16px; fill: var(--text); }
+  .home-indicator { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); width: 134px; height: 5px; background: rgba(255,255,255,0.2); border-radius: 3px; z-index: 10; }
+
+  .screen { padding-top: 54px; padding-bottom: 80px; }
+  .header { display: flex; align-items: center; gap: 4px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+  .back-btn { font-size: 14px; color: var(--text-muted); display: flex; align-items: center; gap: 4px; text-decoration: none; }
+  .back-btn svg { width: 18px; height: 18px; stroke: var(--text-muted); fill: none; stroke-width: 2; }
+
+  .content { padding: 24px 20px; }
+  .dest-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: var(--primary); display: flex; align-items: center; gap: 6px; }
+  .dest-label svg { width: 14px; height: 14px; stroke: var(--primary); fill: none; stroke-width: 2; }
+
+  .clue-text { font-size: 24px; font-weight: 700; line-height: 1.35; margin-top: 16px; letter-spacing: -0.3px; }
+
+  .walk-info { display: flex; align-items: center; gap: 6px; margin-top: 16px; font-size: 14px; color: var(--text-muted); }
+  .walk-info svg { width: 16px; height: 16px; stroke: var(--text-muted); fill: none; stroke-width: 2; }
+
+  .info-card {
+    margin-top: 20px; background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 14px 16px; font-size: 14px;
+    color: var(--text-muted); line-height: 1.5;
+  }
+
+  /* Clue Levels */
+  .clue-levels { margin-top: 28px; }
+  .clue-levels-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-muted); margin-bottom: 14px; }
+
+  .level-item {
+    display: flex; align-items: flex-start; gap: 12px;
+    padding: 12px 0; border-bottom: 1px solid var(--border);
+  }
+  .level-item:last-child { border-bottom: none; }
+  .level-dot {
+    width: 10px; height: 10px; border-radius: 50%; margin-top: 4px; flex-shrink: 0;
+  }
+  .level-dot.active { background: var(--primary); box-shadow: 0 0 8px rgba(128,217,23,0.4); }
+  .level-dot.locked { background: var(--text-faint); opacity: 0.4; }
+  .level-content { flex: 1; }
+  .level-num { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-faint); }
+  .level-text { font-size: 14px; margin-top: 3px; line-height: 1.45; }
+  .level-text.locked { color: var(--text-faint); font-style: italic; }
+  .lock-icon { width: 12px; height: 12px; stroke: var(--text-faint); fill: none; stroke-width: 2; margin-top: 3px; }
+
+  .request-hint {
+    margin-top: 12px; font-size: 13px; color: var(--text-faint);
+    display: flex; align-items: center; gap: 6px;
+    padding: 10px 14px; background: rgba(255,255,255,0.03); border-radius: var(--radius-sm);
+    border: 1px dashed var(--border-strong);
+  }
+  .request-hint svg { width: 14px; height: 14px; stroke: var(--text-faint); fill: none; stroke-width: 2; }
+
+  .btn-primary {
+    display: block; width: 100%; height: 52px; margin-top: 28px;
+    background: var(--primary); color: var(--primary-fg); border: none;
+    border-radius: var(--radius-sm); font-size: 16px; font-weight: 700;
+    font-family: inherit; cursor: pointer;
+  }
+
+  .bottom-nav {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    background: var(--surface); border-top: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-around;
+    padding: 8px 0 20px; z-index: 10;
+  }
+  .nav-item { display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 10px; color: var(--text-faint); min-width: 50px; }
+  .nav-item.active { color: var(--primary); }
+  .nav-item svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.8; }
+  .scan-btn { width: 56px; height: 56px; background: var(--primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-top: -28px; box-shadow: 0 4px 20px rgba(128,217,23,0.35); }
+  .scan-btn svg { width: 26px; height: 26px; stroke: var(--primary-fg); fill: none; stroke-width: 2; }
+</style>
+</head>
+<body>
+  <div class="grain"></div>
+  <div class="status-bar">
+    <span>9:41</span>
+    <span class="icons">
+      <svg viewBox="0 0 24 24"><path d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9zm8 8l3 3 3-3c-1.65-1.66-4.34-1.66-6 0zm-4-4l2 2c2.76-2.76 7.24-2.76 10 0l2-2C15.14 9.14 8.87 9.14 5 13z"/></svg>
+      <svg viewBox="0 0 24 24"><path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z"/></svg>
+    </span>
+  </div>
+
+  <div class="screen">
+    <div class="header">
+      <a href="#" class="back-btn">
+        <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+        Home
+      </a>
+    </div>
+
+    <div class="content">
+      <div class="dest-label">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
+        Next Destination
+      </div>
+
+      <h1 class="clue-text">Where knowledge sleeps beneath open sky, find the stone that watches over all</h1>
+
+      <div class="walk-info">
+        <svg viewBox="0 0 24 24"><path d="M14 4l2.29 2.29-2.88 2.88 1.42 1.42 2.88-2.88L20 10V4zm-4 0H4v6l2.29-2.29 4.71 4.7V20h2v-8.41l-5.29-5.3z"/></svg>
+        About 4 min walk from here
+      </div>
+
+      <div class="info-card">
+        Find this location, then scan the QR poster you see there.
+      </div>
+
+      <div class="clue-levels">
+        <div class="clue-levels-title">Clue Levels</div>
+
+        <div class="level-item">
+          <div class="level-dot active"></div>
+          <div class="level-content">
+            <div class="level-num">Level 1 — Current</div>
+            <div class="level-text">Where knowledge sleeps beneath open sky, find the stone that watches over all</div>
+          </div>
+        </div>
+
+        <div class="level-item">
+          <div class="level-dot locked"></div>
+          <div class="level-content">
+            <div class="level-num">Level 2 — Locked</div>
+            <div class="level-text locked">
+              <svg class="lock-icon" viewBox="0 0 24 24" style="display:inline;vertical-align:middle;margin-right:4px;width:12px;height:12px;stroke:var(--text-faint);fill:none;stroke-width:2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              Request next hint to reveal
+            </div>
+          </div>
+        </div>
+
+        <div class="level-item">
+          <div class="level-dot locked"></div>
+          <div class="level-content">
+            <div class="level-num">Level 3 — Locked</div>
+            <div class="level-text locked">
+              <svg class="lock-icon" viewBox="0 0 24 24" style="display:inline;vertical-align:middle;margin-right:4px;width:12px;height:12px;stroke:var(--text-faint);fill:none;stroke-width:2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              Request next hint to reveal
+            </div>
+          </div>
+        </div>
+
+        <div class="request-hint">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          Request next hint — costs 25 points
+        </div>
+      </div>
+
+      <button class="btn-primary">Open Scanner</button>
+    </div>
+  </div>
+
+  <nav class="bottom-nav">
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+      Home
+    </div>
+    <div class="nav-item active">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
+      Clue
+    </div>
+    <div class="nav-item">
+      <div class="scan-btn">
+        <svg viewBox="0 0 24 24"><path d="M3 7V5c0-1.1.9-2 2-2h2M17 3h2c1.1 0 2 .9 2 2v2M21 17v2c0 1.1-.9 2-2 2h-2M7 21H5c-1.1 0-2-.9-2-2v-2"/><line x1="7" y1="12" x2="17" y2="12"/></svg>
+      </div>
+    </div>
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      Team
+    </div>
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      Activity
+    </div>
+  </nav>
+
+  <div class="home-indicator"></div>
+</body>
+</html>

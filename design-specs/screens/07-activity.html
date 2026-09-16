@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Activity — Campus Hunt</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg: #1a2119; --surface: #242e22;
+    --primary: #80D917; --primary-fg: #1a2e0a;
+    --success: #30B566; --success-strong: #1a8a46;
+    --warning: #E5A820; --danger: #C44040;
+    --text: #F5F3F0; --text-muted: #9BA396; --text-faint: #7A8275;
+    --border: rgba(255,255,255,0.08);
+    --radius: 14px; --radius-sm: 10px;
+  }
+  body { font-family: 'Inter', -apple-system, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; overflow: hidden; }
+  .grain { position: fixed; inset: 0; opacity: 0.03; pointer-events: none; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); background-size: 128px; z-index: 100; }
+  .status-bar { position: absolute; top: 0; left: 0; right: 0; height: 54px; display: flex; align-items: flex-end; justify-content: space-between; padding: 0 28px 8px; font-size: 14px; font-weight: 600; z-index: 10; }
+  .status-bar .icons { display: flex; gap: 6px; }
+  .status-bar .icons svg { width: 16px; height: 16px; fill: var(--text); }
+  .home-indicator { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); width: 134px; height: 5px; background: rgba(255,255,255,0.2); border-radius: 3px; z-index: 10; }
+
+  .screen { padding-top: 54px; padding-bottom: 80px; }
+  .header { padding: 20px 20px 16px; border-bottom: 1px solid var(--border); }
+  .header h1 { font-size: 24px; font-weight: 700; }
+  .header p { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+
+  .content { padding: 16px 20px; }
+
+  .feed-list { }
+  .feed-item {
+    display: flex; align-items: flex-start; gap: 12px;
+    padding: 12px 8px; border-radius: var(--radius-sm);
+    transition: background 0.15s;
+  }
+  .feed-item:hover { background: rgba(255,255,255,0.02); }
+
+  .feed-icon {
+    width: 32px; height: 32px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; margin-top: 1px;
+  }
+  .feed-icon svg { width: 16px; height: 16px; fill: none; stroke-width: 2; }
+  .feed-icon.success { background: rgba(48,181,102,0.12); }
+  .feed-icon.success svg { stroke: var(--success-strong); }
+  .feed-icon.warning { background: rgba(229,168,32,0.12); }
+  .feed-icon.warning svg { stroke: var(--warning); }
+  .feed-icon.danger { background: rgba(196,64,64,0.12); }
+  .feed-icon.danger svg { stroke: var(--danger); }
+  .feed-icon.info { background: rgba(155,163,150,0.1); }
+  .feed-icon.info svg { stroke: var(--text-faint); }
+
+  .feed-body { flex: 1; min-width: 0; }
+  .feed-msg { font-size: 14px; line-height: 1.4; }
+  .feed-time { font-size: 12px; color: var(--text-faint); margin-top: 3px; }
+
+  .feed-points {
+    font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums;
+    flex-shrink: 0; margin-top: 1px;
+  }
+  .feed-points.positive { color: var(--success-strong); }
+  .feed-points.negative { color: var(--danger); }
+
+  .bottom-nav {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    background: var(--surface); border-top: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-around;
+    padding: 8px 0 20px; z-index: 10;
+  }
+  .nav-item { display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 10px; color: var(--text-faint); min-width: 50px; }
+  .nav-item.active { color: var(--primary); }
+  .nav-item svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.8; }
+  .scan-btn { width: 56px; height: 56px; background: var(--primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-top: -28px; box-shadow: 0 4px 20px rgba(128,217,23,0.35); }
+  .scan-btn svg { width: 26px; height: 26px; stroke: var(--primary-fg); fill: none; stroke-width: 2; }
+</style>
+</head>
+<body>
+  <div class="grain"></div>
+  <div class="status-bar">
+    <span>9:41</span>
+    <span class="icons">
+      <svg viewBox="0 0 24 24"><path d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9zm8 8l3 3 3-3c-1.65-1.66-4.34-1.66-6 0zm-4-4l2 2c2.76-2.76 7.24-2.76 10 0l2-2C15.14 9.14 8.87 9.14 5 13z"/></svg>
+      <svg viewBox="0 0 24 24"><path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z"/></svg>
+    </span>
+  </div>
+
+  <div class="screen">
+    <div class="header">
+      <h1>Activity</h1>
+      <p>Everything your team has done, newest first.</p>
+    </div>
+
+    <div class="content">
+      <div class="feed-list">
+        <div class="feed-item">
+          <div class="feed-icon success">
+            <svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          </div>
+          <div class="feed-body">
+            <div class="feed-msg">Completed checkpoint: Library Annex</div>
+            <div class="feed-time">2:34 PM</div>
+          </div>
+          <div class="feed-points positive">+150</div>
+        </div>
+
+        <div class="feed-item">
+          <div class="feed-icon success">
+            <svg viewBox="0 0 24 24"><path d="M20.5 11H19V7c0-1.1-.9-2-2-2h-4V3.5C13 2.12 11.88 1 10.5 1S8 2.12 8 3.5V5H4c-1.1 0-2 .9-2 2v3.8h1.5c1.38 0 2.5 1.12 2.5 2.5S4.88 15.8 3.5 15.8H2V20c0 1.1.9 2 2 2h3.8v-1.5c0-1.38 1.12-2.5 2.5-2.5s2.5 1.12 2.5 2.5V22H17c1.1 0 2-.9 2-2v-4h1.5c1.38 0 2.5-1.12 2.5-2.5S21.88 11 20.5 11z"/></svg>
+          </div>
+          <div class="feed-body">
+            <div class="feed-msg">Solved challenge: Riddle of the Stones</div>
+            <div class="feed-time">2:28 PM</div>
+          </div>
+          <div class="feed-points positive">+200</div>
+        </div>
+
+        <div class="feed-item">
+          <div class="feed-icon warning">
+            <svg viewBox="0 0 24 24"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg>
+          </div>
+          <div class="feed-body">
+            <div class="feed-msg">Routing engine sent you to East Gate</div>
+            <div class="feed-time">2:15 PM</div>
+          </div>
+        </div>
+
+        <div class="feed-item">
+          <div class="feed-icon info">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
+          </div>
+          <div class="feed-body">
+            <div class="feed-msg">Requested next clue level</div>
+            <div class="feed-time">2:10 PM</div>
+          </div>
+          <div class="feed-points negative">-25</div>
+        </div>
+
+        <div class="feed-item">
+          <div class="feed-icon danger">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+          </div>
+          <div class="feed-body">
+            <div class="feed-msg">Scan rejected: already visited</div>
+            <div class="feed-time">2:05 PM</div>
+          </div>
+        </div>
+
+        <div class="feed-item">
+          <div class="feed-icon success">
+            <svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          </div>
+          <div class="feed-body">
+            <div class="feed-msg">Completed checkpoint: Student Center</div>
+            <div class="feed-time">1:52 PM</div>
+          </div>
+          <div class="feed-points positive">+100</div>
+        </div>
+
+        <div class="feed-item">
+          <div class="feed-icon success">
+            <svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          </div>
+          <div class="feed-body">
+            <div class="feed-msg">Completed checkpoint: Science Building</div>
+            <div class="feed-time">1:38 PM</div>
+          </div>
+          <div class="feed-points positive">+150</div>
+        </div>
+
+        <div class="feed-item">
+          <div class="feed-icon success">
+            <svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          </div>
+          <div class="feed-body">
+            <div class="feed-msg">Completed checkpoint: Main Gate</div>
+            <div class="feed-time">1:20 PM</div>
+          </div>
+          <div class="feed-points positive">+100</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <nav class="bottom-nav">
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+      Home
+    </div>
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
+      Clue
+    </div>
+    <div class="nav-item">
+      <div class="scan-btn">
+        <svg viewBox="0 0 24 24"><path d="M3 7V5c0-1.1.9-2 2-2h2M17 3h2c1.1 0 2 .9 2 2v2M21 17v2c0 1.1-.9 2-2 2h-2M7 21H5c-1.1 0-2-.9-2-2v-2"/><line x1="7" y1="12" x2="17" y2="12"/></svg>
+      </div>
+    </div>
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      Team
+    </div>
+    <div class="nav-item active">
+      <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      Activity
+    </div>
+  </nav>
+
+  <div class="home-indicator"></div>
+</body>
+</html>

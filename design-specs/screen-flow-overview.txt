@@ -1,0 +1,16 @@
+Premium dark mobile app screen flow overview — 7 screens of Campus Treasure Hunt game, presented as a clean horizontal row of iPhone 15 Pro mockups on dark canvas, evenly spaced, consistent scale.
+
+Game theme: campus-wide QR treasure hunt. Dark UI, lime green accent, subtle film grain.
+
+Screen order left to right:
+1. LOGIN: Dark card with compass icon badge, "Campus Hunt" title, three input fields, lime sign-in button
+2. DASHBOARD: Score "2,450" prominent, rank "#3", objective card with clue text, stat strip, bottom nav with center scan button
+3. CLUE: Large clue headline "Where knowledge sleeps beneath open sky", walking time, clue levels, lime "Open scanner" button
+4. SCANNER: Full-screen camera viewfinder with lime green corner brackets, minimal chrome
+5. LEADERBOARD: Top 3 podium with gold/silver/bronze tint, clean team list below
+6. TEAM: Stat strip, member list with online dots, progress details
+7. ACTIVITY: Chronological feed with colored icons, messages, score changes
+
+Consistent across all: dark background, lime green accent (#80D917 approximate), white primary text, muted gray secondary, subtle grain texture, clean device frames, even margins, comfortable text size. Premium game UI feel, not corporate. No gradients, no glass, no purple-blue.
+
+Layout: single row, 7 phones evenly distributed, dark background, title "Campus Treasure Hunt — Player Experience" in subtle white text at top. --ar 21:9 --style raw --s 150

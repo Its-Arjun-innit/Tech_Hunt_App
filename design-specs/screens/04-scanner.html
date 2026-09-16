@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scanner — Campus Hunt</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg: #0d120c; --primary: #80D917; --primary-fg: #1a2e0a;
+    --text: #F5F3F0; --text-muted: #9BA396;
+  }
+  body { font-family: 'Inter', -apple-system, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; overflow: hidden; }
+  .status-bar { position: absolute; top: 0; left: 0; right: 0; height: 54px; display: flex; align-items: flex-end; justify-content: space-between; padding: 0 28px 8px; font-size: 14px; font-weight: 600; z-index: 10; color: white; }
+  .status-bar .icons { display: flex; gap: 6px; }
+  .status-bar .icons svg { width: 16px; height: 16px; fill: white; }
+  .home-indicator { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); width: 134px; height: 5px; background: rgba(255,255,255,0.25); border-radius: 3px; z-index: 10; }
+
+  .screen {
+    position: relative; min-height: 100vh;
+    background: linear-gradient(135deg, #0a0f09 0%, #111a10 50%, #0d120c 100%);
+  }
+
+  .back-btn {
+    position: absolute; top: 58px; left: 12px;
+    display: flex; align-items: center; gap: 4px;
+    font-size: 14px; color: white; text-decoration: none;
+    z-index: 10; padding: 8px;
+  }
+  .back-btn svg { width: 18px; height: 18px; stroke: white; fill: none; stroke-width: 2; }
+
+  /* Camera simulation */
+  .camera-area {
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse at center, #1a2518 0%, #0a0f09 100%);
+  }
+
+  /* Viewfinder */
+  .viewfinder {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 240px; height: 240px;
+  }
+
+  .corner {
+    position: absolute;
+    width: 32px; height: 32px;
+    border-color: var(--primary);
+    border-style: solid;
+    border-width: 0;
+  }
+  .corner.tl { top: 0; left: 0; border-top-width: 3px; border-left-width: 3px; border-radius: 4px 0 0 0; }
+  .corner.tr { top: 0; right: 0; border-top-width: 3px; border-right-width: 3px; border-radius: 0 4px 0 0; }
+  .corner.bl { bottom: 0; left: 0; border-bottom-width: 3px; border-left-width: 3px; border-radius: 0 0 0 4px; }
+  .corner.br { bottom: 0; right: 0; border-bottom-width: 3px; border-right-width: 3px; border-radius: 0 0 4px 0; }
+
+  /* Scanning line */
+  .scan-line {
+    position: absolute;
+    top: 50%; left: 16px; right: 16px;
+    height: 2px;
+    background: linear-gradient(90deg, transparent 0%, var(--primary) 20%, var(--primary) 80%, transparent 100%);
+    transform: translateY(-50%);
+    opacity: 0.7;
+    animation: scanPulse 2s ease-in-out infinite;
+  }
+
+  @keyframes scanPulse {
+    0%, 100% { opacity: 0.4; transform: translateY(-50%) scaleX(0.95); }
+    50% { opacity: 0.9; transform: translateY(-50%) scaleX(1); }
+  }
+
+  /* Center crosshair */
+  .crosshair {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 8px; height: 8px;
+  }
+  .crosshair::before, .crosshair::after {
+    content: '';
+    position: absolute;
+    background: rgba(128,217,23,0.3);
+  }
+  .crosshair::before { width: 1px; height: 100%; left: 50%; transform: translateX(-50%); }
+  .crosshair::after { width: 100%; height: 1px; top: 50%; transform: translateY(-50%); }
+
+  .prompt-text {
+    position: absolute;
+    bottom: 160px; left: 0; right: 0;
+    text-align: center;
+    font-size: 16px; font-weight: 600;
+    text-shadow: 0 2px 12px rgba(0,0,0,0.5);
+  }
+
+  .sub-prompt {
+    position: absolute;
+    bottom: 130px; left: 0; right: 0;
+    text-align: center;
+    font-size: 13px;
+    color: var(--text-muted);
+    text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+  }
+
+  /* Subtle grid overlay */
+  .grid-overlay {
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(rgba(128,217,23,0.02) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(128,217,23,0.02) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+  <div class="status-bar">
+    <span>9:41</span>
+    <span class="icons">
+      <svg viewBox="0 0 24 24"><path d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9zm8 8l3 3 3-3c-1.65-1.66-4.34-1.66-6 0zm-4-4l2 2c2.76-2.76 7.24-2.76 10 0l2-2C15.14 9.14 8.87 9.14 5 13z"/></svg>
+      <svg viewBox="0 0 24 24"><path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z"/></svg>
+    </span>
+  </div>
+
+  <div class="screen">
+    <div class="camera-area"></div>
+    <div class="grid-overlay"></div>
+
+    <a href="#" class="back-btn">
+      <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+      Home
+    </a>
+
+    <div class="viewfinder">
+      <div class="corner tl"></div>
+      <div class="corner tr"></div>
+      <div class="corner bl"></div>
+      <div class="corner br"></div>
+      <div class="scan-line"></div>
+      <div class="crosshair"></div>
+    </div>
+
+    <div class="prompt-text">Point your camera at a QR code</div>
+    <div class="sub-prompt">Scan the QR poster at your checkpoint</div>
+  </div>
+
+  <div class="home-indicator"></div>
+</body>
+</html>

@@ -1,6 +1,7 @@
 import { AttemptStatus, type Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { gradeSubmission } from "@/lib/challenges/grade";
+import { recordScore } from "@/lib/scoring/events";
 import { advanceTeam, type NextObjective } from "./advance";
 
 export type ChallengeOutcome =
@@ -93,18 +94,12 @@ export async function submitChallenge(args: {
         },
       });
       if (challenge.penaltyPoints > 0 && !game.scoringFrozen) {
-        await tx.scoreEvent.create({
-          data: {
-            teamId: args.teamId,
-            type: "PENALTY",
-            points: -challenge.penaltyPoints,
-            refId: challenge.id,
-            note: `Failed attempt: ${challenge.title}`,
-          },
-        });
-        await tx.team.update({
-          where: { id: args.teamId },
-          data: { score: { decrement: challenge.penaltyPoints } },
+        await recordScore(tx, {
+          teamId: args.teamId,
+          points: -challenge.penaltyPoints,
+          type: "PENALTY",
+          refId: challenge.id,
+          note: `Failed attempt: ${challenge.title}`,
         });
       }
       return {
@@ -174,26 +169,22 @@ export async function awardAndAdvance(
     random?: () => number;
   },
 ) {
+  await recordScore(tx, {
+    teamId: args.teamId,
+    points: args.points,
+    type: "CHALLENGE",
+    refId: args.challengeId,
+    note: `Challenge: ${args.challengeTitle}`,
+  });
+
   if (args.points > 0) {
-    await tx.scoreEvent.create({
-      data: {
-        teamId: args.teamId,
-        type: "CHALLENGE",
-        points: args.points,
-        refId: args.challengeId,
-        note: `Challenge: ${args.challengeTitle}`,
-      },
-    });
     await tx.challengeAttempt.update({
       where: { id: args.attemptId },
       data: { pointsAwarded: args.points },
     });
   }
 
-  const team = await tx.team.update({
-    where: { id: args.teamId },
-    data: { score: { increment: args.points } },
-  });
+  const team = await tx.team.findUniqueOrThrow({ where: { id: args.teamId } });
 
   await tx.gameEvent.create({
     data: {

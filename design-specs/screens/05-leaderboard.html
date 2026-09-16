@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Leaderboard — Campus Hunt</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg: #1a2119; --surface: #242e22;
+    --primary: #80D917; --primary-fg: #1a2e0a;
+    --gold: #D4A843; --gold-bg: rgba(212,168,67,0.08);
+    --silver: #A8B0B8; --silver-bg: rgba(168,176,184,0.06);
+    --bronze: #C08050; --bronze-bg: rgba(192,128,80,0.06);
+    --text: #F5F3F0; --text-muted: #9BA396; --text-faint: #7A8275;
+    --border: rgba(255,255,255,0.08);
+    --radius: 14px; --radius-sm: 10px;
+  }
+  body { font-family: 'Inter', -apple-system, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; overflow: hidden; }
+  .grain { position: fixed; inset: 0; opacity: 0.03; pointer-events: none; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); background-size: 128px; z-index: 100; }
+  .status-bar { position: absolute; top: 0; left: 0; right: 0; height: 54px; display: flex; align-items: flex-end; justify-content: space-between; padding: 0 28px 8px; font-size: 14px; font-weight: 600; z-index: 10; }
+  .status-bar .icons { display: flex; gap: 6px; }
+  .status-bar .icons svg { width: 16px; height: 16px; fill: var(--text); }
+  .home-indicator { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); width: 134px; height: 5px; background: rgba(255,255,255,0.2); border-radius: 3px; z-index: 10; }
+
+  .screen { padding-top: 54px; padding-bottom: 80px; }
+  .header { padding: 20px 20px 16px; border-bottom: 1px solid var(--border); }
+  .header h1 { font-size: 24px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+  .header h1 svg { width: 22px; height: 22px; stroke: var(--text-muted); fill: none; stroke-width: 2; }
+  .header p { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+
+  .content { padding: 16px 20px; }
+
+  /* Top 3 podium */
+  .podium { margin-bottom: 20px; }
+  .podium-item {
+    display: flex; align-items: center; gap: 14px;
+    padding: 14px 16px; border-radius: var(--radius-sm);
+    margin-bottom: 8px;
+  }
+  .podium-item.first { background: var(--gold-bg); border: 1px solid rgba(212,168,67,0.15); }
+  .podium-item.second { background: var(--silver-bg); border: 1px solid rgba(168,176,184,0.1); }
+  .podium-item.third { background: var(--bronze-bg); border: 1px solid rgba(192,128,80,0.1); }
+  .podium-item.current { border-left: 3px solid var(--primary); }
+
+  .podium-rank {
+    width: 32px; height: 32px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 800; flex-shrink: 0;
+  }
+  .podium-item.first .podium-rank { background: var(--gold); color: #1a1400; }
+  .podium-item.second .podium-rank { background: var(--silver); color: #1a1a1a; }
+  .podium-item.third .podium-rank { background: var(--bronze); color: #1a1000; }
+
+  .podium-info { flex: 1; min-width: 0; }
+  .podium-name { font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .podium-score { font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; text-align: right; }
+  .podium-item.first .podium-score { color: var(--gold); }
+  .podium-item.second .podium-score { color: var(--silver); }
+  .podium-item.third .podium-score { color: var(--bronze); }
+
+  /* Team list */
+  .team-list { }
+  .team-row {
+    display: flex; align-items: center; gap: 14px;
+    padding: 12px 0; border-bottom: 1px solid var(--border);
+  }
+  .team-row:last-child { border-bottom: none; }
+  .team-row.current { border-left: 3px solid var(--primary); padding-left: 12px; margin-left: -12px; }
+
+  .rank-num {
+    width: 28px; font-size: 14px; font-weight: 600;
+    color: var(--text-muted); text-align: center; flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
+  }
+  .team-name { flex: 1; font-size: 14px; }
+  .team-score {
+    font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums;
+  }
+
+  .bottom-nav {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    background: var(--surface); border-top: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-around;
+    padding: 8px 0 20px; z-index: 10;
+  }
+  .nav-item { display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 10px; color: var(--text-faint); min-width: 50px; }
+  .nav-item.active { color: var(--primary); }
+  .nav-item svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.8; }
+  .scan-btn { width: 56px; height: 56px; background: var(--primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-top: -28px; box-shadow: 0 4px 20px rgba(128,217,23,0.35); }
+  .scan-btn svg { width: 26px; height: 26px; stroke: var(--primary-fg); fill: none; stroke-width: 2; }
+</style>
+</head>
+<body>
+  <div class="grain"></div>
+  <div class="status-bar">
+    <span>9:41</span>
+    <span class="icons">
+      <svg viewBox="0 0 24 24"><path d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9zm8 8l3 3 3-3c-1.65-1.66-4.34-1.66-6 0zm-4-4l2 2c2.76-2.76 7.24-2.76 10 0l2-2C15.14 9.14 8.87 9.14 5 13z"/></svg>
+      <svg viewBox="0 0 24 24"><path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z"/></svg>
+    </span>
+  </div>
+
+  <div class="screen">
+    <div class="header">
+      <h1>
+        <svg viewBox="0 0 24 24"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5C7 4 7 8 12 8s5-4 7.5-4a2.5 2.5 0 0 1 0 5H18"/><path d="M12 2v20"/><path d="M6 15h12"/><path d="M6 15c0 3 2.69 5 6 5s6-2 6-5"/></svg>
+        Leaderboard
+      </h1>
+      <p>24 teams competing</p>
+    </div>
+
+    <div class="content">
+      <div class="podium">
+        <div class="podium-item first">
+          <div class="podium-rank">1</div>
+          <div class="podium-info">
+            <div class="podium-name">Night Owls</div>
+          </div>
+          <div class="podium-score">3,200</div>
+        </div>
+        <div class="podium-item second current">
+          <div class="podium-rank">2</div>
+          <div class="podium-info">
+            <div class="podium-name">Alpha Squad</div>
+          </div>
+          <div class="podium-score">2,450</div>
+        </div>
+        <div class="podium-item third">
+          <div class="podium-rank">3</div>
+          <div class="podium-info">
+            <div class="podium-name">Code Breakers</div>
+          </div>
+          <div class="podium-score">2,100</div>
+        </div>
+      </div>
+
+      <div class="team-list">
+        <div class="team-row">
+          <div class="rank-num">4</div>
+          <div class="team-name">Digital Nomads</div>
+          <div class="team-score">1,850</div>
+        </div>
+        <div class="team-row">
+          <div class="rank-num">5</div>
+          <div class="team-name">Pixel Hunters</div>
+          <div class="team-score">1,720</div>
+        </div>
+        <div class="team-row">
+          <div class="rank-num">6</div>
+          <div class="team-name">Binary Stars</div>
+          <div class="team-score">1,580</div>
+        </div>
+        <div class="team-row">
+          <div class="rank-num">7</div>
+          <div class="team-name">Cipher Squad</div>
+          <div class="team-score">1,420</div>
+        </div>
+        <div class="team-row">
+          <div class="rank-num">8</div>
+          <div class="team-name">Debug Dynasty</div>
+          <div class="team-score">1,300</div>
+        </div>
+        <div class="team-row">
+          <div class="rank-num">9</div>
+          <div class="team-name">Byte Force</div>
+          <div class="team-score">1,180</div>
+        </div>
+        <div class="team-row">
+          <div class="rank-num">10</div>
+          <div class="team-name">Quantum Leaps</div>
+          <div class="team-score">950</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <nav class="bottom-nav">
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+      Home
+    </div>
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
+      Clue
+    </div>
+    <div class="nav-item">
+      <div class="scan-btn">
+        <svg viewBox="0 0 24 24"><path d="M3 7V5c0-1.1.9-2 2-2h2M17 3h2c1.1 0 2 .9 2 2v2M21 17v2c0 1.1-.9 2-2 2h-2M7 21H5c-1.1 0-2-.9-2-2v-2"/><line x1="7" y1="12" x2="17" y2="12"/></svg>
+      </div>
+    </div>
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      Team
+    </div>
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      Activity
+    </div>
+  </nav>
+
+  <div class="home-indicator"></div>
+</body>
+</html>

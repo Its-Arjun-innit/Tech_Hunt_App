@@ -12,23 +12,28 @@ export default async function LeaderboardPage() {
   const rows = await getLeaderboard(game.id);
 
   return (
-    <main className="flex-1">
+    <main className="flex-1 grain">
       <AutoRefresh seconds={15} />
 
-      <header className="border-b bg-surface px-5 py-5">
+      <header className="border-b border-border/50 bg-surface/80 backdrop-blur-sm px-5 py-6">
         <div className="mx-auto max-w-lg">
-          <h1 className="flex items-center gap-2 text-2xl font-semibold">
-            <Trophy className="size-5 text-muted-foreground" /> Leaderboard
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {game.leaderboardDelaySeconds > 0
-              ? `Scores are shown with a ${Math.round(game.leaderboardDelaySeconds / 60)} minute delay, so the very latest scans are not counted yet.`
-              : `${rows.length} team${rows.length === 1 ? "" : "s"} competing.`}
-          </p>
+          <div className="flex items-center gap-3">
+            <span className="flex size-10 items-center justify-center rounded-xl bg-primary/10">
+              <Trophy className="size-5 text-primary-strong" />
+            </span>
+            <div>
+              <h1 className="text-2xl font-semibold tracking-tight text-foreground">Leaderboard</h1>
+              <p className="mt-0.5 text-sm text-muted-foreground">
+                {game.leaderboardDelaySeconds > 0
+                  ? `Scores shown with a ${Math.round(game.leaderboardDelaySeconds / 60)} minute delay`
+                  : `${rows.length} team${rows.length === 1 ? "" : "s"} competing`}
+              </p>
+            </div>
+          </div>
         </div>
       </header>
 
-      <div className="mx-auto w-full max-w-lg px-5 py-5">
+      <div className="mx-auto w-full max-w-lg px-5 py-6">
         <LeaderboardRows rows={rows} myTeamId={team.id} />
       </div>
     </main>
