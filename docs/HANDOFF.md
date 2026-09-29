@@ -3,6 +3,10 @@
 Last updated 16 September 2026. Written for whoever picks this up next, including
 a future session with no memory of building it.
 
+Related: [DECISIONS.md](DECISIONS.md) for why the architecture looks the way it
+does, and [WEEKLY-REPORT.md](WEEKLY-REPORT.md) for the week-by-week account of
+what was built.
+
 ---
 
 ## Where things stand
