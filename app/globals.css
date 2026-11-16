@@ -292,4 +292,8 @@
   .pb-safe {
     padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
   }
+  /* Header clears the notch when installed as an app. */
+  .pt-safe {
+    padding-top: env(safe-area-inset-top);
+  }
 }

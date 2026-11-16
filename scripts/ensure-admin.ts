@@ -1,5 +1,5 @@
 /**
- * Creates the first super admin if the database has none.
+ * Creates the first admin if the database has none.
  *
  * Runs during the Vercel build, after migrations, so a fresh deployment has a
  * usable organizer login without anyone having to seed by hand. It is
@@ -18,32 +18,32 @@ async function main() {
     return;
   }
 
-  const existing = await prisma.adminUser.findUnique({ where: { email } });
+  const existing = await prisma.staff.findUnique({ where: { email } });
   if (existing) {
     console.log(`[ensure-admin] ${email} already exists, leaving it untouched.`);
     return;
   }
 
-  const anySuperAdmin = await prisma.adminUser.findFirst({
-    where: { role: "SUPER_ADMIN" },
+  const anySuperAdmin = await prisma.staff.findFirst({
+    where: { role: "ADMIN" },
     select: { email: true },
   });
   if (anySuperAdmin) {
     console.log(
-      `[ensure-admin] a super admin already exists (${anySuperAdmin.email}), skipping.`,
+      `[ensure-admin] a admin already exists (${anySuperAdmin.email}), skipping.`,
     );
     return;
   }
 
-  await prisma.adminUser.create({
+  await prisma.staff.create({
     data: {
       email,
-      name: "Super Admin",
+      name: "College Admin",
       passwordHash: await bcrypt.hash(password, 10),
-      role: "SUPER_ADMIN",
+      role: "ADMIN",
     },
   });
-  console.log(`[ensure-admin] created super admin ${email}.`);
+  console.log(`[ensure-admin] created admin ${email}.`);
 }
 
 main()

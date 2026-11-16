@@ -1,53 +1,5 @@
-import { AlertTriangle, ArrowRight, CircleCheck, PowerOff } from "lucide-react";
+import { CircleCheck, CircleSlash, Clock, ShieldCheck } from "lucide-react";
 import { cn } from "cn";
-import type { TrafficState } from "@/lib/routing/traffic";
-import {
-  TRAFFIC_CLASS,
-  TRAFFIC_ICON,
-  TRAFFIC_LABEL,
-} from "@/lib/routing/traffic-presentation";
-
-const ICONS = {
-  check: CircleCheck,
-  arrow: ArrowRight,
-  alert: AlertTriangle,
-  off: PowerOff,
-} as const;
-
-/**
- * The single way a traffic state is rendered anywhere in the app.
- *
- * Always ships the glyph and the word alongside the colour, because the brand
- * lime and the success emerald are close enough that colour alone would be a
- * weak signal. `compact` drops the word for tight rows but keeps the icon and
- * an accessible label.
- */
-export function TrafficBadge({
-  state,
-  compact = false,
-  className,
-}: {
-  state: TrafficState;
-  compact?: boolean;
-  className?: string;
-}) {
-  const Icon = ICONS[TRAFFIC_ICON[state]];
-  const label = TRAFFIC_LABEL[state];
-
-  return (
-    <span
-      className={cn(
-        "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium",
-        TRAFFIC_CLASS[state],
-        className,
-      )}
-      title={compact ? label : undefined}
-    >
-      <Icon className="size-3 shrink-0" aria-hidden />
-      {compact ? <span className="sr-only">{label}</span> : label}
-    </span>
-  );
-}
 
 type Tone = "success" | "warning" | "danger" | "info" | "neutral" | "brand";
 
@@ -60,7 +12,7 @@ const TONE_CLASS: Record<Tone, string> = {
   brand: "bg-primary/15 text-primary-foreground border-primary/40 dark:text-primary-strong",
 };
 
-/** General status pill for game state, team state, attempt state and so on. */
+/** General status pill. Always carries a word; colour is never the only signal. */
 export function StatusPill({
   tone = "neutral",
   icon: Icon,
@@ -86,10 +38,19 @@ export function StatusPill({
   );
 }
 
-/** Maps a game status to a tone so every surface agrees on the colour. */
-export function gameStatusTone(status: string): Tone {
-  if (status === "ACTIVE") return "success";
-  if (status === "PAUSED") return "warning";
-  if (status === "ENDED") return "neutral";
-  return "info";
+const ATTENDANCE = {
+  PRESENT: { tone: "success", icon: CircleCheck, label: "Present" },
+  LATE: { tone: "warning", icon: Clock, label: "Late" },
+  ABSENT: { tone: "danger", icon: CircleSlash, label: "Absent" },
+  EXCUSED: { tone: "info", icon: ShieldCheck, label: "Excused" },
+} as const;
+
+/** The one way an attendance status is rendered: word, glyph and colour. */
+export function AttendancePill({ status }: { status: keyof typeof ATTENDANCE }) {
+  const a = ATTENDANCE[status];
+  return (
+    <StatusPill tone={a.tone} icon={a.icon}>
+      {a.label}
+    </StatusPill>
+  );
 }

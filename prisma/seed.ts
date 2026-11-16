@@ -1,246 +1,214 @@
 /**
- * Seeds a demo game so the app is playable immediately after setup.
- * Safe to re-run: it wipes and recreates the demo game only.
+ * Demo college: one department, two sections, five subjects, a weekly
+ * timetable and two weeks of attendance history, so every screen has
+ * something real on it.
+ *
+ * WIPES EVERY TABLE. It refuses to run against anything but a local
+ * database unless SEED_FORCE=1 is set.
  */
-import { PrismaClient, AdminRole, ChallengeType } from "@prisma/client";
+import { PrismaClient, type Prisma } from "@prisma/client";
 import bcrypt from "bcryptjs";
-import { generateQrToken, generateTeamCode, generatePin } from "../lib/qr/token";
+import { addDays, campusClock, campusLocalToDate, dateFromKey, dowOfKey, toTimeInput } from "../lib/time";
+import { newSecret } from "../lib/attendance/code";
+import { generateAttendanceToken } from "../lib/qr/token";
+import { resolveDatabaseEnv } from "../lib/db-env";
+
+resolveDatabaseEnv();
+const url = process.env.DATABASE_URL ?? "";
+if (!/@(localhost|127\.0\.0\.1)[:/]/.test(url) && process.env.SEED_FORCE !== "1") {
+  console.error("Refusing to seed: DATABASE_URL is not a local database. Set SEED_FORCE=1 if you really mean it.");
+  process.exit(1);
+}
 
 const prisma = new PrismaClient();
 
-const GAME_NAME = "Campus Treasure Hunt — Demo";
+// Deterministic randomness so the demo looks the same every time.
+function rng(seed: number) {
+  return () => {
+    seed |= 0;
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+const rand = rng(42);
 
-// A compact campus cluster; roughly 100-400m apart.
-const CHECKPOINTS = [
-  { name: "Main Gate", lat: 28.5449, lng: 77.1926, points: 50, difficulty: 1, group: "north", capacity: 3,
-    clues: ["Where every journey on campus begins.", "The first thing you pass each morning.", "The main entrance gate to campus."] },
-  { name: "Central Library", lat: 28.5462, lng: 77.1941, points: 60, difficulty: 2, group: "north", capacity: 2,
-    clues: ["Silence is the loudest rule here.", "Thousands of stories, none of them spoken.", "The central library building."] },
-  { name: "Canteen Courtyard", lat: 28.5471, lng: 77.1918, points: 50, difficulty: 1, group: "north", capacity: 3,
-    clues: ["Where students gather when the day is getting started.", "Follow the smell of chai and samosas.", "The main canteen courtyard."] },
-  { name: "Science Block", lat: 28.5438, lng: 77.1953, points: 70, difficulty: 3, group: "east", capacity: 2,
-    clues: ["Beakers, burners and the smell of experiments.", "Where the periodic table lives on every wall.", "The Science block main entrance." ] },
-  { name: "Sports Ground", lat: 28.5425, lng: 77.1902, points: 60, difficulty: 2, group: "south", capacity: 4,
-    clues: ["Where the grass remembers every match.", "Goalposts stand at both ends.", "The main sports ground." ] },
-  { name: "Auditorium Steps", lat: 28.5457, lng: 77.1889, points: 70, difficulty: 3, group: "south", capacity: 2,
-    clues: ["A thousand seats face one stage.", "Where convocation photographs are taken.", "The steps of the main auditorium." ] },
-  { name: "Admin Block", lat: 28.5482, lng: 77.1935, points: 80, difficulty: 4, group: "east", capacity: 2,
-    clues: ["Every signature you ever needed came from here.", "Fees, forms and long queues.", "The administrative block reception." ] },
-  { name: "Old Banyan Tree", lat: 28.5444, lng: 77.1971, points: 90, difficulty: 5, group: "east", capacity: 2,
-    clues: ["Older than every building around it.", "Its roots hang down like a curtain.", "The old banyan tree near the east lawn." ] },
+const SUBJECTS = [
+  { code: "CS301", name: "Data Structures" },
+  { code: "CS302", name: "Operating Systems" },
+  { code: "CS303", name: "Database Systems" },
+  { code: "CS304", name: "Computer Networks" },
+  { code: "MA301", name: "Discrete Mathematics" },
 ];
-
-// Controlled routing possibilities: each checkpoint offers several next hops.
-const ROUTES: Record<string, string[]> = {
-  "Main Gate": ["Central Library", "Canteen Courtyard", "Sports Ground", "Science Block"],
-  "Central Library": ["Science Block", "Admin Block", "Old Banyan Tree", "Canteen Courtyard"],
-  "Canteen Courtyard": ["Central Library", "Admin Block", "Auditorium Steps", "Sports Ground"],
-  "Science Block": ["Old Banyan Tree", "Admin Block", "Central Library", "Sports Ground"],
-  "Sports Ground": ["Auditorium Steps", "Main Gate", "Canteen Courtyard", "Science Block"],
-  "Auditorium Steps": ["Canteen Courtyard", "Admin Block", "Sports Ground", "Central Library"],
-  "Admin Block": ["Old Banyan Tree", "Central Library", "Canteen Courtyard", "Auditorium Steps"],
-  "Old Banyan Tree": ["Science Block", "Central Library", "Admin Block", "Main Gate"],
-};
-
-const TEAMS = [
-  { name: "Team Alpha", members: ["Aarav", "Diya"] },
-  { name: "Team Beta", members: ["Rohan", "Ishita"] },
-  { name: "Team Gamma", members: ["Kabir", "Meera"] },
+const TEACHERS = [
+  { name: "Anita Rao", email: "anita@campus.edu", role: "HOD" as const },
+  { name: "Vikram Iyer", email: "vikram@campus.edu", role: "TEACHER" as const },
+  { name: "Meera Shah", email: "meera@campus.edu", role: "TEACHER" as const },
+  { name: "Rahul Nair", email: "rahul@campus.edu", role: "TEACHER" as const },
+  { name: "Divya Menon", email: "divya@campus.edu", role: "TEACHER" as const },
 ];
+// Five periods with a break and lunch.
+const PERIODS = [
+  [540, 600],
+  [600, 660],
+  [675, 735],
+  [795, 855],
+  [855, 915],
+];
+const FIRST = ["Aarav", "Diya", "Ishaan", "Kavya", "Arjun", "Ananya", "Rohan", "Saanvi", "Kabir", "Meera", "Vivaan", "Aditi", "Reyansh", "Tara", "Aryan", "Nisha", "Dev", "Pooja", "Karan", "Riya"];
+const LAST = ["Sharma", "Patel", "Reddy", "Iyer", "Gupta", "Nair", "Singh", "Das", "Kulkarni", "Joshi"];
 
 async function main() {
-  const adminEmail = process.env.ADMIN_EMAIL ?? "admin@campus.edu";
-  const adminPassword = process.env.ADMIN_PASSWORD ?? "admin1234";
+  // Children before parents.
+  await prisma.$transaction([
+    prisma.noticeRead.deleteMany(),
+    prisma.notice.deleteMany(),
+    prisma.attendanceRecord.deleteMany(),
+    prisma.attendanceSession.deleteMany(),
+    prisma.slotException.deleteMany(),
+    prisma.timetableSlot.deleteMany(),
+    prisma.course.deleteMany(),
+    prisma.studentSession.deleteMany(),
+    prisma.student.deleteMany(),
+    prisma.staffSession.deleteMany(),
+    prisma.staff.deleteMany(),
+    prisma.subject.deleteMany(),
+    prisma.section.deleteMany(),
+    prisma.department.deleteMany(),
+    prisma.room.deleteMany(),
+    prisma.holiday.deleteMany(),
+    prisma.auditLog.deleteMany(),
+    prisma.settings.deleteMany(),
+  ]);
+  await prisma.settings.create({ data: { id: 1 } });
 
-  // ── Admin + volunteer accounts ──────────────────────────────────
-  const superAdmin = await prisma.adminUser.upsert({
-    where: { email: adminEmail },
-    update: { role: AdminRole.SUPER_ADMIN, active: true },
-    create: {
-      email: adminEmail,
-      name: "Super Admin",
-      passwordHash: await bcrypt.hash(adminPassword, 10),
-      role: AdminRole.SUPER_ADMIN,
-    },
+  const dept = await prisma.department.create({ data: { name: "Computer Science and Engineering", code: "CSE" } });
+  const sections = await Promise.all(
+    ["CSE-A", "CSE-B"].map((name) => prisma.section.create({ data: { name, departmentId: dept.id, year: 2, semester: 3 } })),
+  );
+  const subjects = await Promise.all(SUBJECTS.map((s) => prisma.subject.create({ data: { ...s, departmentId: dept.id } })));
+
+  // A cluster of rooms ~40 m apart. The lab has no location: code-only.
+  const rooms = await Promise.all([
+    prisma.room.create({ data: { name: "Room 101", building: "Block A", latitude: 12.97160, longitude: 77.59460, radiusM: 60 } }),
+    prisma.room.create({ data: { name: "Room 102", building: "Block A", latitude: 12.97195, longitude: 77.59460, radiusM: 60 } }),
+    prisma.room.create({ data: { name: "Lab 1", building: "Block B" } }),
+  ]);
+
+  const staffHash = await bcrypt.hash("teach1234", 10);
+  await prisma.staff.create({
+    data: { name: "College Admin", email: "admin@campus.edu", role: "ADMIN", passwordHash: await bcrypt.hash("admin1234", 10) },
   });
+  const teachers = await Promise.all(
+    TEACHERS.map((t) => prisma.staff.create({ data: { ...t, departmentId: dept.id, passwordHash: staffHash } })),
+  );
 
-  await prisma.adminUser.upsert({
-    where: { email: "volunteer@campus.edu" },
-    update: { active: true },
-    create: {
-      email: "volunteer@campus.edu",
-      name: "Volunteer One",
-      passwordHash: await bcrypt.hash("volunteer1234", 10),
-      role: AdminRole.VOLUNTEER,
-    },
-  });
-
-  // ── Fresh demo game ─────────────────────────────────────────────
-  await prisma.game.deleteMany({ where: { name: GAME_NAME } });
-  const game = await prisma.game.create({
-    data: { name: GAME_NAME, status: "ACTIVE", startsAt: new Date() },
-  });
-
-  const checkpointIds = new Map<string, string>();
-  for (const cp of CHECKPOINTS) {
-    const created = await prisma.checkpoint.create({
-      data: {
-        gameId: game.id,
-        name: cp.name,
-        description: `Checkpoint at ${cp.name}.`,
-        qrToken: generateQrToken(),
-        latitude: cp.lat,
-        longitude: cp.lng,
-        points: cp.points,
-        capacity: cp.capacity,
-        difficulty: cp.difficulty,
-        routeGroup: cp.group,
-        clues: {
-          create: cp.clues.map((text, i) => ({ level: i + 1, text })),
-        },
-      },
-    });
-    checkpointIds.set(cp.name, created.id);
-  }
-
-  for (const [from, targets] of Object.entries(ROUTES)) {
-    for (const to of targets) {
-      await prisma.checkpointRoute.create({
-        data: { fromId: checkpointIds.get(from)!, toId: checkpointIds.get(to)! },
-      });
+  // Teacher i takes subject i in both sections.
+  const courses = new Map<string, string>(); // `${section}:${subject}` → course id
+  for (const sec of sections) {
+    for (const [i, sub] of subjects.entries()) {
+      const c = await prisma.course.create({ data: { subjectId: sub.id, sectionId: sec.id, teacherId: teachers[i].id } });
+      courses.set(`${sec.id}:${i}`, c.id);
     }
   }
 
-  // ── One challenge of each type, spread across checkpoints ────────
-  const challenges: {
-    checkpoint: string;
-    type: ChallengeType;
-    title: string;
-    prompt: string;
-    config: unknown;
-  }[] = [
-    {
-      checkpoint: "Central Library",
-      type: ChallengeType.QUIZ,
-      title: "Library Quiz",
-      prompt: "Answer both questions about the library.",
-      config: {
-        questions: [
-          { question: "What is the Dewey Decimal class for Science?", options: ["300", "400", "500", "600"], answerIndex: 2 },
-          { question: "What does ISBN stand for?", options: ["International Standard Book Number", "Indexed Book Name", "Internal Sorted Book Number", "International Sorted Book Naming"], answerIndex: 0 },
-        ],
-      },
-    },
-    {
-      checkpoint: "Science Block",
-      type: ChallengeType.RIDDLE,
-      title: "Element Riddle",
-      prompt: "I am the lightest of them all, first in the table, found in every star. What am I?",
-      config: { answers: ["hydrogen", "h"] },
-    },
-    {
-      checkpoint: "Old Banyan Tree",
-      type: ChallengeType.PUZZLE,
-      title: "Anagram Puzzle",
-      prompt: "Unscramble: NAYNAB",
-      config: { answers: ["banyan"] },
-    },
-    {
-      checkpoint: "Sports Ground",
-      type: ChallengeType.PHYSICAL,
-      title: "Relay Sprint",
-      prompt: "Complete one lap as a team. A volunteer will verify you.",
-      config: {},
-    },
-    {
-      checkpoint: "Auditorium Steps",
-      type: ChallengeType.PHOTO,
-      title: "Team Photo",
-      prompt: "Take a photo of your whole team on the auditorium steps.",
-      config: {},
-    },
-    {
-      checkpoint: "Admin Block",
-      type: ChallengeType.MULTI_STAGE,
-      title: "Paper Trail",
-      prompt: "Three stages, one after another.",
-      config: {
-        stages: [
-          { prompt: "How many floors does the admin block have?", answers: ["3", "three"] },
-          { prompt: "What colour is the reception desk?", answers: ["brown", "wooden"] },
-          { prompt: "Name the office that issues transcripts.", answers: ["registrar", "registrar office"] },
-        ],
-      },
-    },
-  ];
-
-  for (const c of challenges) {
-    await prisma.challenge.create({
-      data: {
-        checkpointId: checkpointIds.get(c.checkpoint)!,
-        type: c.type,
-        title: c.title,
-        prompt: c.prompt,
-        points: 40,
-        maxAttempts: 3,
-        penaltyPoints: 5,
-        config: c.config as never,
-      },
-    });
+  // Mon–Fri. Section B runs two subjects ahead of A, so at any period the two
+  // sections have different subjects and therefore different teachers.
+  const slots: { id: string; sectionIdx: number; dow: number; startMin: number; courseId: string; teacherId: string }[] = [];
+  for (let dow = 1; dow <= 5; dow++) {
+    for (const [p, [startMin, endMin]] of PERIODS.entries()) {
+      for (const [s, sec] of sections.entries()) {
+        const subjectIdx = (dow + p + s * 2) % 5;
+        const courseId = courses.get(`${sec.id}:${subjectIdx}`)!;
+        // The networks course uses the lab on Fridays.
+        const roomId = subjectIdx === 3 && dow === 5 ? rooms[2].id : rooms[s].id;
+        const slot = await prisma.timetableSlot.create({ data: { courseId, roomId, dayOfWeek: dow, startMin, endMin } });
+        slots.push({ id: slot.id, sectionIdx: s, dow, startMin, courseId, teacherId: teachers[subjectIdx].id });
+      }
+    }
   }
 
-  // ── Teams, players and their credentials ────────────────────────
-  const credentials: string[][] = [];
-  for (const t of TEAMS) {
-    const team = await prisma.team.create({
-      data: { gameId: game.id, name: t.name, code: generateTeamCode() },
-    });
-    for (let i = 0; i < t.members.length; i++) {
-      const memberCode = `${t.name.split(" ")[1][0]}${String(i + 1).padStart(3, "0")}`;
-      const pin = generatePin();
-      await prisma.player.create({
+  const pinHash = await bcrypt.hash("123456", 10);
+  const students: { id: string; sectionIdx: number; rate: number }[] = [];
+  for (const [s, sec] of sections.entries()) {
+    for (let i = 1; i <= 20; i++) {
+      const name = `${FIRST[(i + s * 7) % FIRST.length]} ${LAST[(i * 3 + s) % LAST.length]}`;
+      const st = await prisma.student.create({
+        data: { rollNo: `23CS${sec.name.slice(-1)}${String(i).padStart(3, "0")}`, name, sectionId: sec.id, pinHash },
+      });
+      // Most students attend well; a few drift below 75%.
+      students.push({ id: st.id, sectionIdx: s, rate: i % 6 === 0 ? 0.62 : 0.8 + rand() * 0.18 });
+    }
+  }
+
+  // Two weeks of history, up to yesterday. Today stays clean so a teacher can start a session.
+  const today = campusClock().dateKey;
+  const records: Prisma.AttendanceRecordCreateManyInput[] = [];
+  for (let back = 14; back >= 1; back--) {
+    const key = addDays(today, -back);
+    const dow = dowOfKey(key);
+    for (const slot of slots.filter((x) => x.dow === dow)) {
+      const openedAt = campusLocalToDate(`${key}T${toTimeInput(slot.startMin + 2)}`)!;
+      const session = await prisma.attendanceSession.create({
         data: {
-          teamId: team.id,
-          name: t.members[i],
-          memberCode,
-          pinHash: await bcrypt.hash(pin, 10),
+          courseId: slot.courseId,
+          slotId: slot.id,
+          openedById: slot.teacherId,
+          date: dateFromKey(key),
+          token: generateAttendanceToken(),
+          secret: newSecret(),
+          openedAt,
+          lateAt: new Date(openedAt.getTime() + 10 * 60_000),
+          closesAt: new Date(openedAt.getTime() + 15 * 60_000),
         },
       });
-      credentials.push([t.name, t.members[i], memberCode, pin]);
+      for (const st of students.filter((x) => x.sectionIdx === slot.sectionIdx)) {
+        if (rand() > st.rate) continue; // absent: no row
+        const late = rand() < 0.08;
+        const flagged = rand() < 0.02;
+        records.push({
+          sessionId: session.id,
+          studentId: st.id,
+          status: late ? "LATE" : "PRESENT",
+          method: rand() < 0.85 ? "QR" : "CODE",
+          flagged,
+          flagReason: flagged ? "Location not shared" : null,
+          createdAt: new Date(openedAt.getTime() + (late ? 11 : 2) * 60_000),
+        });
+      }
     }
   }
+  await prisma.attendanceRecord.createMany({ data: records });
 
-  await prisma.announcement.create({
-    data: { gameId: game.id, message: "Welcome! The hunt is live. Good luck." },
+  await prisma.holiday.create({ data: { date: dateFromKey(addDays(today, 9)), name: "Founders' Day" } });
+  await prisma.notice.createMany({
+    data: [
+      {
+        authorId: teachers[0].id,
+        title: "Mid-semester exams start next Monday",
+        body: "The exam timetable is up on the department board. Hall tickets from the office from Thursday.",
+        audience: "DEPARTMENT",
+        targetId: dept.id,
+        pinned: true,
+      },
+      {
+        authorId: teachers[1].id,
+        title: "OS assignment 2 due Friday",
+        body: "Submit the scheduler simulation as a single PDF. Late submissions lose 10% per day.",
+        audience: "SECTION",
+        targetId: sections[0].id,
+      },
+    ],
   });
 
-  await prisma.auditLog.create({
-    data: {
-      gameId: game.id,
-      actorType: "SYSTEM",
-      actorId: superAdmin.id,
-      actorName: "seed",
-      action: "GAME_SEEDED",
-      entity: "Game",
-      entityId: game.id,
-    },
-  });
+  console.log(`
+Seeded ${students.length} students, ${teachers.length} teachers, ${slots.length} weekly classes, ${records.length} attendance marks.
 
-  const tokens = await prisma.checkpoint.findMany({
-    where: { gameId: game.id },
-    select: { name: true, qrToken: true },
-    orderBy: { createdAt: "asc" },
-  });
-
-  console.log("\n─────────── Demo game seeded ───────────");
-  console.log(`Game: ${game.name} (${game.status})`);
-  console.log(`\nAdmin login   → ${adminEmail} / ${adminPassword}`);
-  console.log("Volunteer     → volunteer@campus.edu / volunteer1234");
-  console.log("\nPlayer logins (team | name | member code | PIN):");
-  for (const row of credentials) console.log("  " + row.join(" | "));
-  console.log("\nCheckpoint scan URLs:");
-  for (const t of tokens) console.log(`  ${t.name.padEnd(20)} /scan/${t.qrToken}`);
-  console.log("────────────────────────────────────────\n");
+Admin      admin@campus.edu   / admin1234
+Teachers   anita@campus.edu (HOD), vikram@, meera@, rahul@, divya@  / teach1234
+Students   23CSA001 … 23CSA020, 23CSB001 … 23CSB020  / PIN 123456
+`);
 }
 
 main()

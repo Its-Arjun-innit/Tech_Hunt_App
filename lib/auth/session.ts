@@ -3,11 +3,12 @@ import { cookies, headers } from "next/headers";
 import { prisma } from "@/lib/db";
 import { generateSessionToken } from "@/lib/qr/token";
 
-export const PLAYER_COOKIE = "th_player";
-export const ADMIN_COOKIE = "th_admin";
+export const STUDENT_COOKIE = "ch_student";
+export const STAFF_COOKIE = "ch_staff";
 
-const PLAYER_TTL_HOURS = 12;
-const ADMIN_TTL_HOURS = 12;
+// A semester-long app: nobody wants to type a PIN every morning.
+const STUDENT_TTL_DAYS = 30;
+const STAFF_TTL_DAYS = 7;
 
 function cookieOptions(expires: Date) {
   return {
@@ -19,7 +20,7 @@ function cookieOptions(expires: Date) {
   };
 }
 
-/** Client IP and user agent, for the scan audit trail. */
+/** Client IP and user agent, for the audit trail. */
 export async function requestMeta() {
   const h = await headers();
   const forwarded = h.get("x-forwarded-for");
@@ -30,52 +31,45 @@ export async function requestMeta() {
 }
 
 /**
- * Starts a player session. Any existing session for the player is deleted
- * first, which enforces one active device per player and makes admin
- * "force logout" a simple session delete.
+ * Starts a student session. Every other session for the student is deleted
+ * first: one phone per student. Signing in on a friend's phone to mark for
+ * them signs the friend's own account out of that phone's cookie, and the
+ * student out of their own phone, which makes proxying noisy.
  */
-export async function createPlayerSession(playerId: string) {
+export async function createStudentSession(studentId: string) {
   const { ip, userAgent } = await requestMeta();
   const token = generateSessionToken();
-  const expiresAt = new Date(Date.now() + PLAYER_TTL_HOURS * 3600_000);
+  const expiresAt = new Date(Date.now() + STUDENT_TTL_DAYS * 86_400_000);
 
   await prisma.$transaction([
-    prisma.session.deleteMany({ where: { playerId } }),
-    prisma.session.create({
-      data: { token, playerId, expiresAt, ip, userAgent },
-    }),
-    prisma.player.update({
-      where: { id: playerId },
-      data: { lastLoginAt: new Date(), lastActiveAt: new Date() },
-    }),
+    prisma.studentSession.deleteMany({ where: { studentId } }),
+    prisma.studentSession.create({ data: { token, studentId, expiresAt, ip, userAgent } }),
+    prisma.student.update({ where: { id: studentId }, data: { lastLoginAt: new Date() } }),
   ]);
 
-  (await cookies()).set(PLAYER_COOKIE, token, cookieOptions(expiresAt));
+  (await cookies()).set(STUDENT_COOKIE, token, cookieOptions(expiresAt));
 }
 
-export async function createAdminSession(adminId: string) {
+export async function createStaffSession(staffId: string) {
   const token = generateSessionToken();
-  const expiresAt = new Date(Date.now() + ADMIN_TTL_HOURS * 3600_000);
+  const expiresAt = new Date(Date.now() + STAFF_TTL_DAYS * 86_400_000);
 
-  await prisma.adminSession.create({ data: { token, adminId, expiresAt } });
-  await prisma.adminUser.update({
-    where: { id: adminId },
-    data: { lastLoginAt: new Date() },
-  });
+  await prisma.staffSession.create({ data: { token, staffId, expiresAt } });
+  await prisma.staff.update({ where: { id: staffId }, data: { lastLoginAt: new Date() } });
 
-  (await cookies()).set(ADMIN_COOKIE, token, cookieOptions(expiresAt));
+  (await cookies()).set(STAFF_COOKIE, token, cookieOptions(expiresAt));
 }
 
-export async function destroyPlayerSession() {
+export async function destroyStudentSession() {
   const store = await cookies();
-  const token = store.get(PLAYER_COOKIE)?.value;
-  if (token) await prisma.session.deleteMany({ where: { token } });
-  store.delete(PLAYER_COOKIE);
+  const token = store.get(STUDENT_COOKIE)?.value;
+  if (token) await prisma.studentSession.deleteMany({ where: { token } });
+  store.delete(STUDENT_COOKIE);
 }
 
-export async function destroyAdminSession() {
+export async function destroyStaffSession() {
   const store = await cookies();
-  const token = store.get(ADMIN_COOKIE)?.value;
-  if (token) await prisma.adminSession.deleteMany({ where: { token } });
-  store.delete(ADMIN_COOKIE);
+  const token = store.get(STAFF_COOKIE)?.value;
+  if (token) await prisma.staffSession.deleteMany({ where: { token } });
+  store.delete(STAFF_COOKIE);
 }

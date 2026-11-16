@@ -10,19 +10,14 @@ function randomString(length: number): string {
   return out;
 }
 
-/** Opaque public checkpoint token, e.g. cp_x8k29fq2mz. Never a database id. */
-export function generateQrToken(): string {
-  return `cp_${randomString(10)}`;
+/** Opaque public attendance-session token, e.g. at_x8k29fq2mz. Never a database id. */
+export function generateAttendanceToken(): string {
+  return `at_${randomString(10)}`;
 }
 
-/** Session token for the player/admin cookie. */
+/** Session token for the student/staff cookie. */
 export function generateSessionToken(): string {
   return randomBytes(32).toString("base64url");
-}
-
-/** Short human-friendly team code, e.g. TM-4KQ7. */
-export function generateTeamCode(): string {
-  return `TM-${randomString(4).toUpperCase()}`;
 }
 
 /** Cryptographically random 6-digit PIN, zero padded. */
@@ -30,14 +25,16 @@ export function generatePin(): string {
   return String(randomInt(0, 1_000_000)).padStart(6, "0");
 }
 
+/** Readable temporary password for new staff, e.g. "kq7m-x2pd". */
+export function generatePassword(): string {
+  return `${randomString(4)}-${randomString(4)}`;
+}
+
 /**
- * Public origin the QR posters point at.
+ * Public origin the attendance QR points at.
  *
- * Only ever read on the server, so it needs no NEXT_PUBLIC_ prefix. On Vercel
- * the production URL is provided automatically, which means a deployment
- * prints working posters even when nobody configured an origin. Getting this
- * wrong is expensive: posters are printed and taped to walls, and a localhost
- * URL cannot be scanned by any phone.
+ * On Vercel the production URL is provided automatically. Getting this wrong
+ * means a QR no phone can open, so it is derived rather than hand-set.
  */
 export function appUrl(): string {
   const configured = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL;
@@ -49,13 +46,7 @@ export function appUrl(): string {
   return "http://localhost:3000";
 }
 
-/** URL encoded into a checkpoint QR poster. */
-export function scanUrl(token: string): string {
-  return `${appUrl()}/scan/${token}`;
-}
-
-/** Accepts a full scan URL or a bare token and returns the token. */
-export function extractToken(raw: string): string | null {
-  const match = raw.trim().match(/(?:^|\/scan\/)(cp_[a-z0-9]+)\/?$/i);
-  return match ? match[1] : null;
+/** URL encoded into the rotating attendance QR. */
+export function attendanceUrl(token: string, code: string, origin = appUrl()): string {
+  return `${origin}/a/${token}?c=${code}`;
 }

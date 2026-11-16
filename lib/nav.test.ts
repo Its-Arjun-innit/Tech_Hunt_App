@@ -4,24 +4,24 @@ import { isActiveNav } from "./nav";
 
 test("the overview matches only itself", () => {
   assert.ok(isActiveNav("/admin", "/admin"));
-  assert.ok(!isActiveNav("/admin/teams", "/admin"));
-  assert.ok(!isActiveNav("/admin/checkpoints/abc123", "/admin"));
+  assert.ok(!isActiveNav("/admin/students", "/admin"));
+  assert.ok(!isActiveNav("/admin/courses/abc123", "/admin"));
 });
 
 test("a section stays active on its nested routes", () => {
-  assert.ok(isActiveNav("/admin/checkpoints", "/admin/checkpoints"));
-  assert.ok(isActiveNav("/admin/checkpoints/abc123", "/admin/checkpoints"));
-  assert.ok(isActiveNav("/admin/teams/import", "/admin/teams"));
+  assert.ok(isActiveNav("/admin/courses", "/admin/courses"));
+  assert.ok(isActiveNav("/admin/courses/abc123", "/admin/courses"));
+  assert.ok(isActiveNav("/admin/students/import", "/admin/students"));
 });
 
 test("a sibling with a shared prefix does not match", () => {
-  // /admin/challenges must not light up Checkpoints.
-  assert.ok(!isActiveNav("/admin/challenges", "/admin/checkpoints"));
-  assert.ok(!isActiveNav("/admin/teams-archive", "/admin/teams"));
+  // A shared prefix must not light up the wrong item.
+  assert.ok(!isActiveNav("/admin/courses-old", "/admin/courses"));
+  assert.ok(!isActiveNav("/admin/students-archive", "/admin/students"));
 });
 
 test("trailing slashes do not change the result", () => {
   assert.ok(isActiveNav("/admin/", "/admin"));
-  assert.ok(isActiveNav("/admin/checkpoints/", "/admin/checkpoints"));
-  assert.ok(!isActiveNav("/admin/teams/", "/admin"));
+  assert.ok(isActiveNav("/admin/courses/", "/admin/courses"));
+  assert.ok(!isActiveNav("/admin/students/", "/admin"));
 });

@@ -1,5 +1,5 @@
 {
-  "name": "campus-treasure-hunt",
+  "name": "campus-app",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -17,7 +17,6 @@
   "dependencies": {
     "@base-ui/react": "^1.8.0",
     "@prisma/client": "^6.19.3",
-    "@vis.gl/react-google-maps": "^1.10.0",
     "bcryptjs": "^3.0.3",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.2.6",

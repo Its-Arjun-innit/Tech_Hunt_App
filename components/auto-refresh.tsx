@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 
 /**
@@ -21,11 +21,10 @@ export function AutoRefresh({
   const router = useRouter();
   const [lastRefresh, setLastRefresh] = useState(() => Date.now());
   const [paused, setPaused] = useState(false);
-  const [, setTick] = useState(0);
+  const [now, setNow] = useState(lastRefresh);
   // The label is clock-derived, so it cannot be server rendered without a
   // hydration mismatch. Hold it back until the client has mounted.
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  const mounted = useSyncExternalStore(noop, () => true, () => false);
 
   const refresh = useCallback(() => {
     router.refresh();
@@ -43,7 +42,6 @@ export function AutoRefresh({
       if (visible) refresh();
     };
     document.addEventListener("visibilitychange", onVisible);
-    setPaused(document.visibilityState !== "visible");
 
     return () => {
       clearInterval(id);
@@ -54,13 +52,13 @@ export function AutoRefresh({
   // Re-render once a second purely to age the label.
   useEffect(() => {
     if (!showIndicator) return;
-    const id = setInterval(() => setTick((t) => t + 1), 1000);
+    const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, [showIndicator]);
 
   if (!showIndicator || !mounted) return null;
 
-  const age = Math.max(0, Math.round((Date.now() - lastRefresh) / 1000));
+  const age = Math.max(0, Math.round((now - lastRefresh) / 1000));
   const label = paused ? "Paused" : age < 3 ? "Updated just now" : `Updated ${age}s ago`;
 
   return (
@@ -87,4 +85,8 @@ export function AutoRefresh({
       {label}
     </span>
   );
+}
+
+function noop() {
+  return () => {};
 }

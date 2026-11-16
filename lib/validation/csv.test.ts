@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseCsv, parseRoster } from "./csv";
+import { parseCsv, parseTable } from "./csv";
 
 test("parses quoted fields, escaped quotes and embedded commas", () => {
   const rows = parseCsv('a,"b,c","say ""hi"""\n1,2,3');
@@ -18,36 +18,20 @@ test("handles CRLF, trailing newline and a byte-order mark", () => {
   ]);
 });
 
-test("skips a header row when it looks like one", () => {
-  const { rows, errors } = parseRoster(
-    "Team Name,Member Name,Member Code\nTeam Alpha,Player 1,A001\nTeam Beta,Player 2,B001",
-  );
-  assert.equal(errors.length, 0);
+test("maps loosely named headers to keys, in any column order", () => {
+  const { rows, errors } = parseTable("Name,Roll No,SECTION\nAsha,23CSA001,CSE-A", ["rollNo", "name", "section"]);
+  assert.deepEqual(errors, []);
+  assert.deepEqual(rows, [{ rollNo: "23CSA001", name: "Asha", section: "CSE-A" }]);
+});
+
+test("reports a missing column instead of guessing", () => {
+  const { rows, errors } = parseTable("Name,Section\nAsha,CSE-A", ["rollNo", "name"]);
+  assert.equal(rows.length, 0);
+  assert.match(errors[0], /rollNo/);
+});
+
+test("rows with an empty required cell are reported by line and skipped", () => {
+  const { rows, errors } = parseTable("roll no,name\n1,Asha\n2,\n3,Ravi", ["rollNo", "name"]);
   assert.equal(rows.length, 2);
-  assert.deepEqual(rows[0], { teamName: "Team Alpha", memberName: "Player 1", memberCode: "A001" });
-});
-
-test("keeps the first row when there is no header", () => {
-  const { rows } = parseRoster("Team Alpha,Player 1,A001");
-  assert.equal(rows.length, 1);
-  assert.equal(rows[0].teamName, "Team Alpha");
-});
-
-test("allows a missing member code but rejects missing names", () => {
-  const { rows, errors } = parseRoster("Team Alpha,Player 1\nTeam Beta,\n,Player 3");
-  assert.equal(rows.length, 1);
-  assert.equal(rows[0].memberCode, "");
-  assert.equal(errors.length, 2);
-});
-
-test("flags a duplicate member code inside one team", () => {
-  const { rows, errors } = parseRoster("Team Alpha,P1,A001\nTeam Alpha,P2,A001");
-  assert.equal(rows.length, 1);
-  assert.match(errors[0], /repeated/);
-});
-
-test("the same code in different teams is fine", () => {
-  const { rows, errors } = parseRoster("Team Alpha,P1,A001\nTeam Beta,P2,A001");
-  assert.equal(rows.length, 2);
-  assert.equal(errors.length, 0);
+  assert.deepEqual(errors, ["Line 3: name is empty."]);
 });

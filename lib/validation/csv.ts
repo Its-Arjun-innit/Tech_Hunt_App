@@ -56,41 +56,33 @@ export function parseCsv(input: string): string[][] {
     .filter((r) => r.some((c) => c.length > 0));
 }
 
-export type RosterRow = { teamName: string; memberName: string; memberCode: string };
-
 /**
- * Reads a roster of Team Name / Member Name / Member Code. A header row is
- * detected and skipped; member codes are generated when a row omits one.
+ * Reads a CSV whose first row names the columns, into objects keyed by the
+ * lower-cased header. Headers are matched loosely ("Roll No", "roll_no" and
+ * "rollno" are the same column), so an export straight from a college ERP
+ * usually imports without editing.
  */
-export function parseRoster(input: string): { rows: RosterRow[]; errors: string[] } {
+export function parseTable<K extends string>(
+  input: string,
+  required: readonly K[],
+): { rows: Record<K, string>[]; errors: string[] } {
   const table = parseCsv(input);
+  if (table.length < 2) return { rows: [], errors: ["Add a header row and at least one data row."] };
+
+  const norm = (h: string) => h.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const header = table[0].map(norm);
+  const index = Object.fromEntries(required.map((k) => [k, header.indexOf(norm(k))])) as Record<K, number>;
+
+  const missing = required.filter((k) => index[k] === -1);
+  if (missing.length) return { rows: [], errors: [`Missing column: ${missing.join(", ")}.`] };
+
+  const rows: Record<K, string>[] = [];
   const errors: string[] = [];
-  const rows: RosterRow[] = [];
-
-  if (table.length === 0) return { rows, errors: ["The file is empty."] };
-
-  const first = table[0].map((c) => c.toLowerCase());
-  const hasHeader = first.some((c) => c.includes("team")) && first.some((c) => c.includes("member") || c.includes("name"));
-  const body = hasHeader ? table.slice(1) : table;
-
-  const seen = new Set<string>();
-  body.forEach((cells, i) => {
-    const line = i + (hasHeader ? 2 : 1);
-    const [teamName, memberName, memberCode = ""] = cells;
-
-    if (!teamName || !memberName) {
-      errors.push(`Line ${line}: team name and member name are both required.`);
-      return;
-    }
-    const key = `${teamName.toLowerCase()}|${memberCode.toLowerCase()}`;
-    if (memberCode && seen.has(key)) {
-      errors.push(`Line ${line}: member code ${memberCode} is repeated for ${teamName}.`);
-      return;
-    }
-    if (memberCode) seen.add(key);
-
-    rows.push({ teamName, memberName, memberCode });
+  table.slice(1).forEach((cells, i) => {
+    const row = Object.fromEntries(required.map((k) => [k, cells[index[k]] ?? ""])) as Record<K, string>;
+    const empty = required.filter((k) => !row[k]);
+    if (empty.length) errors.push(`Line ${i + 2}: ${empty.join(", ")} is empty.`);
+    else rows.push(row);
   });
-
   return { rows, errors };
 }

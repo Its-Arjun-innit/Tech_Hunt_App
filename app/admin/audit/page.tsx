@@ -1,82 +1,41 @@
-import { ClipboardList } from "lucide-react";
-import { requireAdmin } from "@/lib/auth/admin";
+import { requireStaff } from "@/lib/auth/staff";
 import { prisma } from "@/lib/db";
-import { getCurrentGame } from "@/lib/game-engine/current-game";
 import { PageHeader } from "@/components/admin/page-header";
-import { EmptyState } from "@/components/admin/empty-state";
-import { AuditLog } from "@/components/admin/audit-log";
 
 export const dynamic = "force-dynamic";
+export const metadata = { title: "Audit log" };
 
-export default async function AuditPage({ searchParams }: PageProps<"/admin/audit">) {
-  await requireAdmin();
-  const game = await getCurrentGame();
-  if (!game) {
-    return (
-      <EmptyState icon={ClipboardList} title="No game yet" description="Create a game first." />
-    );
-  }
-
-  const { tab } = await searchParams;
-  const defaultTab = typeof tab === "string" ? tab : "scans";
-
-  const [scans, logs, events] = await Promise.all([
-    prisma.scanEvent.findMany({
-      where: { team: { gameId: game.id } },
-      include: {
-        team: { select: { name: true } },
-        player: { select: { name: true } },
-        checkpoint: { select: { name: true } },
-      },
-      orderBy: { createdAt: "desc" },
-      take: 200,
-    }),
-    prisma.auditLog.findMany({
-      where: { OR: [{ gameId: game.id }, { gameId: null }] },
-      orderBy: { createdAt: "desc" },
-      take: 200,
-    }),
-    prisma.gameEvent.findMany({
-      where: { gameId: game.id },
-      orderBy: { createdAt: "desc" },
-      take: 200,
-    }),
-  ]);
+export default async function AuditPage() {
+  await requireStaff("ADMIN");
+  const logs = await prisma.auditLog.findMany({ orderBy: { createdAt: "desc" }, take: 300 });
 
   return (
     <div className="max-w-5xl space-y-6">
-      <PageHeader
-        title="Audit log"
-        description="Every scan attempt, including rejections, and every admin action. This is what disputes get settled from."
-      />
-
-      <AuditLog
-        defaultTab={defaultTab}
-        scans={scans.map((s) => ({
-          id: s.id,
-          at: s.createdAt.toISOString(),
-          result: s.result,
-          team: s.team.name,
-          player: s.player.name,
-          checkpoint: s.checkpoint?.name ?? "unknown checkpoint",
-          points: s.pointsAwarded,
-          ip: s.ip,
-        }))}
-        logs={logs.map((l) => ({
-          id: l.id,
-          at: l.createdAt.toISOString(),
-          actorType: l.actorType,
-          action: l.action,
-          actor: l.actorName,
-          entity: l.entity ? `${l.entity} ${l.entityId?.slice(0, 8) ?? ""}`.trim() : null,
-        }))}
-        events={events.map((e) => ({
-          id: e.id,
-          at: e.createdAt.toISOString(),
-          type: e.type,
-          message: e.message,
-        }))}
-      />
+      <PageHeader title="Audit log" description="Sign-ins, wrong codes, overrides and every admin change. The last 300." />
+      <div className="overflow-x-auto rounded-lg border">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/40 text-left text-xs text-muted-foreground">
+            <tr>
+              <th className="px-3 py-2">When</th>
+              <th className="px-3 py-2">Who</th>
+              <th className="px-3 py-2">Action</th>
+              <th className="px-3 py-2">On</th>
+            </tr>
+          </thead>
+          <tbody>
+            {logs.map((l) => (
+              <tr key={l.id} className="border-t">
+                <td className="whitespace-nowrap px-3 py-1.5 text-muted-foreground">
+                  {l.createdAt.toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: process.env.CAMPUS_TZ || "Asia/Kolkata" })}
+                </td>
+                <td className="px-3 py-1.5">{l.actorName ?? l.actorType.toLowerCase()}</td>
+                <td className="px-3 py-1.5 font-mono text-xs">{l.action}</td>
+                <td className="px-3 py-1.5 text-muted-foreground">{l.entity ? `${l.entity} ${l.entityId?.slice(0, 12) ?? ""}` : ""}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

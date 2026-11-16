@@ -1,5 +1,5 @@
-// Campus Treasure Hunt — data model.
-// Source of truth for all game state. Never trust the client.
+// Campus app — data model for one college.
+// Source of truth for every attendance mark, timetable and notice. Never trust the client.
 
 generator client {
   provider = "prisma-client-js"
@@ -11,431 +11,340 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-// ─────────────────────────────── Game ───────────────────────────────
+// ───────────────────────────── Structure ────────────────────────────
 
-enum GameStatus {
-  DRAFT
-  ACTIVE
-  PAUSED
-  ENDED
+model Department {
+  id   String @id @default(cuid())
+  name String
+  code String @unique
+
+  sections Section[]
+  subjects Subject[]
+  staff    Staff[]
 }
 
-enum ClueUnlockMode {
-  TIME
-  REQUEST
-  BOTH
+model Section {
+  id           String @id @default(cuid())
+  departmentId String
+  /// e.g. "CSE-A"
+  name         String @unique
+  year         Int    @default(1)
+  semester     Int    @default(1)
+
+  department Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  students   Student[]
+  courses    Course[]
 }
 
-model Game {
-  id                      String         @id @default(cuid())
-  name                    String
-  status                  GameStatus     @default(DRAFT)
-  startsAt                DateTime?
-  endsAt                  DateTime?
-  scoringFrozen           Boolean        @default(false)
-  scansLocked             Boolean        @default(false)
-  /// When true a team may only score at the checkpoint it was routed to.
-  enforceRouting          Boolean        @default(true)
-  /// Hide score changes newer than this many seconds on the public leaderboard.
-  leaderboardDelaySeconds Int            @default(0)
-  clueUnlockMode          ClueUnlockMode @default(BOTH)
-  /// Seconds before the next clue level unlocks on its own.
-  clueUnlockAfterSeconds  Int            @default(300)
-  /// Points deducted when a team asks for a clearer clue.
-  clueRequestCost         Int            @default(10)
-  /// Overrides for ROUTING_CONFIG defaults; see lib/routing/config.ts
-  routingConfig           Json?
-  createdAt               DateTime       @default(now())
-  updatedAt               DateTime       @updatedAt
-
-  teams         Team[]
-  checkpoints   Checkpoint[]
-  announcements Announcement[]
-  events        GameEvent[]
-  auditLogs     AuditLog[]
-}
-
-// ─────────────────────────── Teams & players ────────────────────────
-
-enum TeamStatus {
-  ACTIVE
-  DISABLED
-  FINISHED
-}
-
-model Team {
-  id        String     @id @default(cuid())
-  gameId    String
-  name      String
-  code      String
-  /// Cached sum of ScoreEvent.points. ScoreEvent remains the source of truth.
-  score     Int        @default(0)
-  status    TeamStatus @default(ACTIVE)
-  finalRank Int?
-
-  currentCheckpointId String?
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-
-  game              Game                @relation(fields: [gameId], references: [id], onDelete: Cascade)
-  currentCheckpoint Checkpoint?         @relation("TeamCurrentCheckpoint", fields: [currentCheckpointId], references: [id], onDelete: SetNull)
-  players           Player[]
-  scanEvents        ScanEvent[]
-  scoreEvents       ScoreEvent[]
-  assignments       RoutingAssignment[]
-  attempts          ChallengeAttempt[]
-  events            GameEvent[]
-
-  @@unique([gameId, name])
-  @@unique([gameId, code])
-  @@index([gameId, score])
-}
-
-enum PlayerStatus {
-  ACTIVE
-  DISABLED
-}
-
-model Player {
-  id           String       @id @default(cuid())
-  teamId       String
-  memberCode   String
-  pinHash      String
+model Subject {
+  id           String @id @default(cuid())
+  departmentId String
+  code         String @unique
   name         String
-  status       PlayerStatus @default(ACTIVE)
-  lastLoginAt  DateTime?
-  lastActiveAt DateTime?
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
 
-  team       Team        @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  sessions   Session[]
-  scanEvents ScanEvent[]
-
-  @@unique([teamId, memberCode])
+  department Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  courses    Course[]
 }
 
-model Session {
+model Room {
+  id        String  @id @default(cuid())
+  name      String  @unique
+  building  String?
+  /// Unset coordinates switch the location check off for this room.
+  latitude  Float?
+  longitude Float?
+  radiusM   Int     @default(60)
+
+  slots              TimetableSlot[]
+  exceptions         SlotException[]
+  attendanceSessions AttendanceSession[]
+}
+
+/// Who teaches which subject to which section. Timetable slots, attendance
+/// sessions and reports all hang off this row.
+model Course {
+  id        String @id @default(cuid())
+  subjectId String
+  sectionId String
+  teacherId String
+
+  subject  Subject             @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  section  Section             @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  teacher  Staff               @relation(fields: [teacherId], references: [id], onDelete: Restrict)
+  slots    TimetableSlot[]
+  sessions AttendanceSession[]
+
+  @@unique([subjectId, sectionId])
+  @@index([teacherId])
+}
+
+// ─────────────────────────────── People ─────────────────────────────
+
+enum StudentStatus {
+  ACTIVE
+  DISABLED
+}
+
+model Student {
+  id          String        @id @default(cuid())
+  sectionId   String
+  rollNo      String        @unique
+  name        String
+  pinHash     String
+  status      StudentStatus @default(ACTIVE)
+  lastLoginAt DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  section  Section            @relation(fields: [sectionId], references: [id], onDelete: Restrict)
+  sessions StudentSession[]
+  records  AttendanceRecord[]
+  reads    NoticeRead[]
+}
+
+/// One row per signed-in device. Creating a session deletes the others, so a
+/// student is signed in on one phone at a time; that is the proxy guard.
+model StudentSession {
   id        String   @id @default(cuid())
   token     String   @unique
-  playerId  String
+  studentId String
   expiresAt DateTime
   userAgent String?
   ip        String?
   createdAt DateTime @default(now())
 
-  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
-  @@index([playerId])
+  @@index([studentId])
 }
 
-// ─────────────────────────── Admin & volunteers ─────────────────────
-
-enum AdminRole {
-  SUPER_ADMIN
-  GAME_ADMIN
-  VOLUNTEER
+enum StaffRole {
+  TEACHER
+  HOD
+  ADMIN
 }
 
-model AdminUser {
+model Staff {
   id           String    @id @default(cuid())
   email        String    @unique
   name         String
   passwordHash String
-  role         AdminRole @default(VOLUNTEER)
+  role         StaffRole @default(TEACHER)
+  departmentId String?
   active       Boolean   @default(true)
-  /// Volunteers are usually posted at one checkpoint.
-  checkpointId String?
   lastLoginAt  DateTime?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  checkpoint       Checkpoint?        @relation(fields: [checkpointId], references: [id], onDelete: SetNull)
-  sessions         AdminSession[]
-  verifiedAttempts ChallengeAttempt[]
+  department    Department?         @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  sessions      StaffSession[]
+  courses       Course[]
+  notices       Notice[]
+  substitutions SlotException[]
+  opened        AttendanceSession[]
+  marked        AttendanceRecord[]
 }
 
-model AdminSession {
+model StaffSession {
   id        String   @id @default(cuid())
   token     String   @unique
-  adminId   String
+  staffId   String
   expiresAt DateTime
   createdAt DateTime @default(now())
 
-  admin AdminUser @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  staff Staff @relation(fields: [staffId], references: [id], onDelete: Cascade)
 
-  @@index([adminId])
+  @@index([staffId])
 }
 
-// ───────────────────────────── Checkpoints ──────────────────────────
+// ───────────────────────────── Timetable ────────────────────────────
 
-model Checkpoint {
-  id          String   @id @default(cuid())
-  gameId      String
-  name        String
-  description String?
-  /// Opaque public token embedded in the QR code, e.g. cp_x8k29fq2mz
-  qrToken     String   @unique
-  latitude    Float
-  longitude   Float
-  points      Int      @default(50)
-  /// Teams that can be present at once before the checkpoint counts as RED.
-  capacity    Int      @default(2)
-  active      Boolean  @default(true)
-  routeGroup  String?
-  /// 1 (easy) .. 5 (hard). Used by the routing engine difficulty fit.
-  difficulty  Int      @default(3)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+/// A weekly recurring class. Minutes are counted from local midnight in the
+/// campus time zone (CAMPUS_TZ), so 9:30 is 570.
+model TimetableSlot {
+  id        String  @id @default(cuid())
+  courseId  String
+  roomId    String?
+  /// 0 = Sunday … 6 = Saturday
+  dayOfWeek Int
+  startMin  Int
+  endMin    Int
 
-  game        Game                @relation(fields: [gameId], references: [id], onDelete: Cascade)
-  clues       Clue[]
-  challenge   Challenge?
-  scanEvents  ScanEvent[]
-  routesFrom  CheckpointRoute[]   @relation("RouteFrom")
-  routesTo    CheckpointRoute[]   @relation("RouteTo")
-  assignments RoutingAssignment[]
-  teamsHere   Team[]              @relation("TeamCurrentCheckpoint")
-  volunteers  AdminUser[]
+  course     Course              @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  room       Room?               @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  exceptions SlotException[]
+  sessions   AttendanceSession[]
 
-  @@index([gameId, active])
+  @@index([dayOfWeek])
 }
 
-/// Allowed next checkpoints. The routing engine picks one of these per team.
-model CheckpointRoute {
-  id     String @id @default(cuid())
-  fromId String
-  toId   String
+/// A one-day change to a slot: cancelled, moved, another room or a substitute.
+/// Null fields keep the slot's usual value.
+model SlotException {
+  id           String   @id @default(cuid())
+  slotId       String
+  date         DateTime @db.Date
+  cancelled    Boolean  @default(false)
+  startMin     Int?
+  endMin       Int?
+  roomId       String?
+  substituteId String?
+  note         String?
+  createdAt    DateTime @default(now())
 
-  from Checkpoint @relation("RouteFrom", fields: [fromId], references: [id], onDelete: Cascade)
-  to   Checkpoint @relation("RouteTo", fields: [toId], references: [id], onDelete: Cascade)
+  slot       TimetableSlot @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  room       Room?         @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  substitute Staff?        @relation(fields: [substituteId], references: [id], onDelete: SetNull)
 
-  @@unique([fromId, toId])
-  @@index([fromId])
+  @@unique([slotId, date])
+  @@index([date])
 }
 
-/// Clues describe how to reach the checkpoint they belong to.
-/// Level 1 is cryptic; higher levels get progressively clearer.
-model Clue {
-  id           String @id @default(cuid())
-  checkpointId String
-  level        Int
-  text         String
-
-  checkpoint  Checkpoint          @relation(fields: [checkpointId], references: [id], onDelete: Cascade)
-  assignments RoutingAssignment[]
-
-  @@unique([checkpointId, level])
+model Holiday {
+  id   String   @id @default(cuid())
+  date DateTime @unique @db.Date
+  name String
 }
 
-// ───────────────────────────── Challenges ───────────────────────────
+// ───────────────────────────── Attendance ───────────────────────────
 
-enum ChallengeType {
+/// One class meeting a teacher opened for marking. Open while now < closesAt;
+/// marks after lateAt count as LATE. Both are compared at read time, so no job
+/// ever closes a session or writes ABSENT rows: no record means absent.
+model AttendanceSession {
+  id         String   @id @default(cuid())
+  courseId   String
+  slotId     String?
+  roomId     String?
+  openedById String
+  date       DateTime @db.Date
+  /// Public id in the QR link. Never a database id.
+  token      String   @unique
+  /// HMAC key for the rotating six-digit code. Never leaves the server.
+  secret     String
+  openedAt   DateTime @default(now())
+  lateAt     DateTime
+  closesAt   DateTime
+
+  course   Course             @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  slot     TimetableSlot?     @relation(fields: [slotId], references: [id], onDelete: SetNull)
+  room     Room?              @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  openedBy Staff              @relation(fields: [openedById], references: [id], onDelete: Restrict)
+  records  AttendanceRecord[]
+
+  @@index([courseId, openedAt])
+  @@index([closesAt])
+}
+
+enum AttendanceStatus {
+  PRESENT
+  LATE
+  ABSENT
+  EXCUSED
+}
+
+enum MarkMethod {
   QR
-  QUIZ
-  PUZZLE
-  RIDDLE
-  PHYSICAL
-  PHOTO
-  MULTI_STAGE
+  CODE
+  MANUAL
 }
 
-model Challenge {
-  id               String        @id @default(cuid())
-  checkpointId     String        @unique
-  type             ChallengeType
-  title            String
-  prompt           String
-  points           Int           @default(50)
-  maxAttempts      Int           @default(3)
-  timeLimitSeconds Int?
-  penaltyPoints    Int           @default(0)
-  /// Type-specific payload validated by lib/challenges/schemas.ts
-  config           Json
-  active           Boolean       @default(true)
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
+model AttendanceRecord {
+  id         String           @id @default(cuid())
+  sessionId  String
+  studentId  String
+  status     AttendanceStatus
+  method     MarkMethod
+  latitude   Float?
+  longitude  Float?
+  distanceM  Int?
+  /// Accepted but worth a teacher's look, e.g. outside the room radius.
+  flagged    Boolean          @default(false)
+  flagReason String?
+  markedById String?
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
 
-  checkpoint Checkpoint         @relation(fields: [checkpointId], references: [id], onDelete: Cascade)
-  attempts   ChallengeAttempt[]
+  session  AttendanceSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  student  Student           @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  markedBy Staff?            @relation(fields: [markedById], references: [id], onDelete: SetNull)
+
+  /// Two taps, two phones or a retry all land on this constraint: one mark per class.
+  @@unique([sessionId, studentId])
+  @@index([studentId])
 }
 
-enum AttemptStatus {
-  PENDING
-  SUCCESS
-  FAILED
+// ─────────────────────────────── Notices ────────────────────────────
+
+enum NoticeAudience {
+  ALL
+  DEPARTMENT
+  SECTION
 }
 
-model ChallengeAttempt {
-  id            String        @id @default(cuid())
-  teamId        String
-  challengeId   String
-  status        AttemptStatus @default(PENDING)
-  /// Submitted answer / photo / stage payload.
-  payload       Json?
-  stageIndex    Int           @default(0)
-  pointsAwarded Int           @default(0)
-  verifiedById  String?
-  note          String?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+model Notice {
+  id            String         @id @default(cuid())
+  authorId      String
+  title         String
+  body          String
+  audience      NoticeAudience @default(SECTION)
+  /// Department or section id; null for ALL.
+  targetId      String?
+  pinned        Boolean        @default(false)
+  urgent        Boolean        @default(false)
+  attachmentUrl String?
+  /// Future-dated notices stay hidden until this passes. Read-time, no job.
+  scheduledFor  DateTime?
+  createdAt     DateTime       @default(now())
 
-  team       Team       @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  challenge  Challenge  @relation(fields: [challengeId], references: [id], onDelete: Cascade)
-  verifiedBy AdminUser? @relation(fields: [verifiedById], references: [id], onDelete: SetNull)
+  author Staff        @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  reads  NoticeRead[]
 
-  @@index([teamId, challengeId])
-  @@index([status])
+  @@index([audience, targetId, createdAt])
 }
 
-// ─────────────────────────── Scans & scoring ────────────────────────
+model NoticeRead {
+  noticeId  String
+  studentId String
+  readAt    DateTime @default(now())
 
-enum ScanResult {
-  SUCCESS
-  DUPLICATE
-  INVALID_TOKEN
-  INACTIVE_CHECKPOINT
-  WRONG_CHECKPOINT
-  GAME_NOT_ACTIVE
-  TEAM_DISABLED
-  RATE_LIMITED
+  notice  Notice  @relation(fields: [noticeId], references: [id], onDelete: Cascade)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@id([noticeId, studentId])
 }
 
-/// Immutable audit record of every scan attempt, successful or not.
-model ScanEvent {
-  id            String     @id @default(cuid())
-  teamId        String
-  playerId      String
-  checkpointId  String?
-  result        ScanResult
-  pointsAwarded Int        @default(0)
-  /// Human-readable routing decision produced for this scan.
-  routingReason String?
-  ip            String?
-  userAgent     String?
-  createdAt     DateTime   @default(now())
+// ───────────────────────────── Settings, audit ──────────────────────
 
-  team       Team        @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  player     Player      @relation(fields: [playerId], references: [id], onDelete: Cascade)
-  checkpoint Checkpoint? @relation(fields: [checkpointId], references: [id], onDelete: SetNull)
-
-  @@index([teamId, checkpointId, result])
-  @@index([playerId, createdAt])
-  @@index([createdAt])
+enum GeoMode {
+  /// Location is not checked.
+  OFF
+  /// Marks outside the room radius are accepted and flagged for the teacher.
+  FLAG
+  /// Marks outside the room radius are refused.
+  REJECT
 }
 
-enum ScoreEventType {
-  CHECKPOINT
-  CHALLENGE
-  CLUE_COST
-  PENALTY
-  ADMIN_ADJUSTMENT
-}
-
-/// Append-only ledger. Team.score is a cached sum of these rows.
-model ScoreEvent {
-  id        String         @id @default(cuid())
-  teamId    String
-  type      ScoreEventType
-  points    Int
-  /// Id of the checkpoint / challenge / attempt this refers to.
-  refId     String?
-  note      String?
-  createdAt DateTime       @default(now())
-
-  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
-
-  @@index([teamId, createdAt])
-}
-
-// ────────────────────── Routing & soft reservations ─────────────────
-
-enum AssignmentStatus {
-  ACTIVE
-  COMPLETED
-  EXPIRED
-  CANCELLED
-}
-
-/// An ACTIVE, unexpired assignment doubles as the soft reservation that tells
-/// the routing engine a team is already approaching this checkpoint.
-model RoutingAssignment {
-  id                  String           @id @default(cuid())
-  teamId              String
-  checkpointId        String
-  fromCheckpointId    String?
-  status              AssignmentStatus @default(ACTIVE)
-  score               Float            @default(0)
-  /// Why the engine picked this checkpoint; shown in the admin routing view.
-  reason              String?
-  estimatedTravelTime Int              @default(0)
-  clueId              String?
-  clueLevel           Int              @default(1)
-  clueUnlockedAt      DateTime         @default(now())
-  expiresAt           DateTime
-  createdAt           DateTime         @default(now())
-  updatedAt           DateTime         @updatedAt
-
-  team       Team       @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  checkpoint Checkpoint @relation(fields: [checkpointId], references: [id], onDelete: Cascade)
-  clue       Clue?      @relation(fields: [clueId], references: [id], onDelete: SetNull)
-
-  @@index([checkpointId, status, expiresAt])
-  @@index([teamId, status])
-}
-
-// ──────────────────────── Comms, events, audit ──────────────────────
-
-enum AnnouncementAudience {
-  ALL_TEAMS
-  SELECTED_TEAMS
-  VOLUNTEERS
-  ADMINS
-}
-
-model Announcement {
-  id        String               @id @default(cuid())
-  gameId    String
-  message   String
-  audience  AnnouncementAudience @default(ALL_TEAMS)
-  /// Only meaningful when audience is SELECTED_TEAMS.
-  teamIds   String[]             @default([])
-  /// Future-dated announcements stay hidden until this passes. Compared at
-  /// read time, like reservation expiry, so no scheduler is needed.
-  scheduledFor DateTime?
-  createdAt DateTime             @default(now())
-
-  game Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
-
-  @@index([gameId, createdAt])
-}
-
-/// Player-visible activity feed plus admin overview stream.
-model GameEvent {
-  id        String   @id @default(cuid())
-  gameId    String
-  teamId    String?
-  type      String
-  message   String
-  meta      Json?
-  createdAt DateTime @default(now())
-
-  game Game  @relation(fields: [gameId], references: [id], onDelete: Cascade)
-  team Team? @relation(fields: [teamId], references: [id], onDelete: Cascade)
-
-  @@index([gameId, createdAt])
-  @@index([teamId, createdAt])
+/// Single row, id 1.
+model Settings {
+  id               Int     @id @default(1)
+  /// Below this percentage a student is a defaulter.
+  minAttendancePct Int     @default(75)
+  /// Minutes after opening that a mark still counts as present.
+  lateAfterMin     Int     @default(10)
+  /// Minutes a session stays open for marking.
+  sessionMinutes   Int     @default(15)
+  geoMode          GeoMode @default(FLAG)
 }
 
 enum ActorType {
-  ADMIN
-  PLAYER
+  STAFF
+  STUDENT
   SYSTEM
 }
 
 model AuditLog {
   id        String    @id @default(cuid())
-  gameId    String?
   actorType ActorType
   actorId   String?
   actorName String?
@@ -446,8 +355,6 @@ model AuditLog {
   ip        String?
   createdAt DateTime  @default(now())
 
-  game Game? @relation(fields: [gameId], references: [id], onDelete: SetNull)
-
-  @@index([gameId, createdAt])
-  @@index([action])
+  @@index([createdAt])
+  @@index([action, actorId, createdAt])
 }

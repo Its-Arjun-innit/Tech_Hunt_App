@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { appUrl, extractToken, generatePin, generateQrToken } from "./token";
+import { appUrl, attendanceUrl, generateAttendanceToken, generatePin } from "./token";
+import { parseScan } from "./parse";
 
 const KEYS = ["APP_URL", "NEXT_PUBLIC_APP_URL", "VERCEL_PROJECT_PRODUCTION_URL"] as const;
 
@@ -52,16 +53,21 @@ test("falls back to localhost when nothing is configured", () => {
   withEnv({}, () => assert.equal(appUrl(), "http://localhost:3000"));
 });
 
-test("a scan URL round-trips back to its token", () => {
-  withEnv({ APP_URL: "https://hunt.example.edu" }, () => {
-    const token = generateQrToken();
-    assert.match(token, /^cp_[a-z0-9]{10}$/);
-    assert.equal(extractToken(`https://hunt.example.edu/scan/${token}`), token);
-    assert.equal(extractToken(token), token);
-    assert.equal(extractToken("https://example.com/not-a-scan"), null);
+test("an attendance URL round-trips to its token and code", () => {
+  const token = generateAttendanceToken();
+  assert.match(token, /^at_[a-z0-9]{10}$/);
+  assert.deepEqual(parseScan(attendanceUrl(token, "042917", "https://campus.example.edu")), {
+    token,
+    code: "042917",
   });
 });
 
-test("generated PINs are always six digits", () => {
-  for (let i = 0; i < 200; i++) assert.match(generatePin(), /^\d{6}$/);
+test("a bare typed code parses without a token; anything else is null", () => {
+  assert.deepEqual(parseScan("042 917"), { token: null, code: "042917" });
+  assert.equal(parseScan("https://example.com/menu"), null);
+  assert.equal(parseScan("12345"), null);
+});
+
+test("PINs are six digits", () => {
+  for (let i = 0; i < 50; i++) assert.match(generatePin(), /^\d{6}$/);
 });
